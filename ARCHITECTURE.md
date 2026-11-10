@@ -18,6 +18,11 @@ describing the change and fills in explanations. The human runs
 feedback, and flags spots for deeper agent work. Agents read the feedback back
 out, act on it, and add a new **iteration** to the same file.
 
+While writing the code, the agent records notes — wrong assumptions,
+deviations, surprises — that become red and yellow **flags** on the lines they
+concern. It also orders each commit's files for reading and prepares a
+**guide**: a short, step-by-step presentation of the change.
+
 The human should be able to judge design and concepts from summaries, and open
 a diff or the code only when details matter or a summary looks wrong.
 
@@ -74,6 +79,13 @@ review id to its file path and open/closed state. `build` registers; `close`
 marks closed. It exists so `prune` can find orphans — reviews whose file is
 gone, e.g. with a removed worktree — without scanning every worktree.
 
+### Journal
+
+`$(git rev-parse --git-path review-helper)/journal.jsonl`, per-worktree like
+review files. `review-helper note` appends one JSON line per note while the
+agent works; no review file is needed yet. Notes leave the journal when `fill`
+places them into a review (§7).
+
 ### Cleanup
 
 `review-helper prune [--dry-run]` deletes the refs of closed reviews and of
@@ -109,13 +121,15 @@ Tables, in outline (exact DDL lives in `Review::Helper::DB`, versioned by a
 | `iteration` | number, base sha, head sha, pinned ref, created, note (what this iteration changed). |
 | `summary` | Per iteration: the top-level agent summary — what, why, how. |
 | `commit_entry` | Per iteration: sha, position, subject, message, patch-id, agent summary. |
-| `file_change` | Per commit: path, old path, status (A/D/M/R), kind (perl/js/css/html/markdown/text/image/binary), lines or bytes before/after, added/removed/changed counts, split source (`script`/`agent`/`agent-checked`), agent file summary, object system, paradigms. |
+| `file_change` | Per commit: path, old path, reading position, status (A/D/M/R), kind (perl/js/css/html/markdown/text/image/binary), lines or bytes before/after, added/removed/changed counts, split source (`script`/`agent`/`agent-checked`), agent file summary, object system, paradigms. |
 | `section` | Per file change: kind (`unit`/`top-level`/`end`), name, package, code line ranges, doc line ranges, old-side ranges for deleted units, counts, agent summary. |
 | `feedback` | Target (review/commit/file/section/line), iteration, commit sha, path, line, side (old/new), body, created, status (`open`/`addressed`/`declined`), agent response, iteration that resolved it. |
 | `request` | Kind (`debate`/`split`/`check-split`), target, human note, status, results (debate: the case for, the case against). |
+| `flag` | Color (`red`/`yellow`), kind (`assumption`/`deviation`/`test-revealed`/`self-review`/`interest`), anchor (commit sha + path + line range, or a whole commit or file), sentence, brief, detail. |
+| `guide_step` | Per iteration: position, target, optional highlight ranges (path, side, lines), commentary. |
 
-Feedback anchors to commit sha + path + line in that commit's blob, never to a
-section id. Blobs are immutable, so anchors survive re-splits and iterations.
+Feedback and flags anchor to commit sha + path + line in that commit's blob,
+never to a section id. Blobs are immutable, so anchors survive re-splits and iterations.
 
 ---
 
@@ -150,9 +164,10 @@ attributed to the section holding the next new-side line.
 
 `review-helper iterate <file> [--base <rev>] [--head <rev>]` adds iteration
 N+1 (base defaults to the previous base, head to `HEAD`) and pins it.
-Explanations carry forward for any commit whose patch-id matches one in the
-previous iteration, and for sections whose content is unchanged. Everything
-else is left empty for the sheet. Earlier iterations stay viewable for as long
+Explanations, reading order and flags carry forward for any commit whose
+patch-id matches one in the previous iteration, and section explanations for
+sections whose content is unchanged. Everything else is left empty for the
+sheet. Each iteration gets its own guide; none carries forward. Earlier iterations stay viewable for as long
 as their pinned refs exist.
 
 ---
@@ -281,6 +296,60 @@ Size is line count (bytes for binaries); unchanged size is uncolored.
   server's hunk JSON. Each line is its own row, so line feedback can attach to
   any of them.
 
+### Reading order
+
+The agent orders each commit's files so a file comes after the files needed to
+understand it. A global **Reading order | A–Z** toggle (default reading order,
+remembered in `localStorage`) orders tree nodes and stacked file views. Until
+the agent fills it, reading order falls back to A–Z and the toggle shows it as
+pending. Commits stay in commit order; sections stay in file order.
+
+### Flags
+
+- Diff and file views show a flag icon in the gutter of flagged lines, in the
+  flag's color. Hovering shows the one-sentence explanation; clicking opens a
+  popup with the brief summary and an expander for the detail.
+- Tree nodes (commit, file, section) carry a flag count badge in the worst
+  color they contain.
+- The review summary lists every flag, linking to each.
+
+### Guide
+
+The agent's presentation of the iteration: an ordered list of steps.
+
+- **Step target:** the review summary, a commit, a file, a section, a flag, a
+  diff (commit, file or section), or "view file" at a line range. Optional
+  **highlight** ranges mark the exact lines the step talks about.
+- **Commentary:** one or two short sentences, at most 300 characters, written
+  to be read aloud — it says "the highlighted loop" or "the Builder module",
+  never code tokens. The guide may skip commit overviews it already covers and
+  goes into diffs and source only at points of interest.
+- **Playing drives the real page.** A step sets the same view state a click
+  would (tree, sideways sections, diff), then scrolls to the target and marks
+  highlighted lines with a tinted background and gutter bar. Steps change the
+  URL, so the browser's back button follows them too.
+- **Guide bar** pinned at the bottom of the main column: commentary, step
+  `n / N`, back, play, next, speech toggle, exit. Play enters guide mode at
+  step 1; from then on only next and back move. Nothing advances on its own.
+  Exploring the page by hand does not leave guide mode; next resumes from the
+  current step. Reading order does not affect the guide.
+- Entry: a play button in the header and a **Guide** button in the review
+  summary; hidden when the iteration has no guide.
+
+### Speech
+
+Optional narration of guide commentary, generated by the browser's Web Speech
+API (`speechSynthesis`). No server work, no stored audio, no agent tokens.
+
+- Toggle in the guide bar, off by default; hidden when the browser offers no
+  voices.
+- When on, each step's commentary is read when the step is shown; changing
+  step cancels the current reading.
+- Voice picker lists on-device voices (`localService`) first and defaults to
+  the first one matching the page language. Online voices are labeled
+  "(online: text leaves this machine)".
+- Speed 0.75–1.5x. Toggle, voice and speed are remembered in `localStorage`.
+
 ### Summaries shown
 
 - Review, commit: what, why, how.
@@ -320,7 +389,7 @@ Size is line count (bytes for binaries); unchanged size is uncolored.
 ```
 GET  /                              index.html
 GET  /static/*                      share/ assets
-GET  /api/review                    review, iterations, summary, commit list
+GET  /api/review                    review, iterations, summary, commit list, flags, guide
 GET  /api/commit/:sha               commit detail, file changes
 GET  /api/file/:sha/*path           file change detail, sections
 GET  /api/diff/:sha/*path           hunks JSON; ?section=<id> limits to its ranges
@@ -343,6 +412,9 @@ review-helper <file> [--port N] [--open]   serve (shorthand for `serve`)
 review-helper serve <file> ...
 review-helper build --base <rev> [--head <rev>] [--title <t>] [--file <path>]
 review-helper iterate <file> [--base <rev>] [--head <rev>]
+review-helper note --flag red|yellow --kind <kind> --path <p> [--unit <name>]
+    [--snippet <text>] --summary <sentence> [--brief <text>] [--detail <text>]
+                                           append a note to the journal
 review-helper sheet <file>                 print the fill sheet
 review-helper fill <file> <sheet.json>     validate and import a filled sheet
 review-helper feedback <file> [--open]     print feedback JSON
@@ -365,6 +437,10 @@ a review file.
 - review summary; commit summaries; file summaries with object system and
   paradigms; section summaries;
 - splits for files with no parser, or with a `split`/`check-split` request;
+- reading order for each commit;
+- placement of each journal note (commit + path + line range, or a whole
+  commit or file), using its path, unit and snippet hints;
+- the iteration's guide;
 - responses (status and text) for open feedback;
 - results for open requests.
 
@@ -372,20 +448,28 @@ Each item carries an id, a revision hash of the data it describes, and
 pointers (commit, path, section name, line ranges). It carries no code; the
 agent reads code through git.
 
-`fill` validates the whole sheet before writing anything: unknown ids, wrong
-field types, stale revisions, and bad split ranges are rejected with a message
-naming the item. A valid sheet is written in one transaction. Partial sheets
+`fill` validates the whole sheet before writing anything and rejects, with a
+message naming the item:
+
+- unknown ids, wrong field types, stale revisions;
+- split or flag ranges outside the file, overlapping split ranges;
+- a reading order that is not exactly the commit's paths, once each;
+- guide steps whose target or highlight does not exist in the iteration;
+- guide commentary over 300 characters or containing code tokens: backticks,
+  `->`, `::`, `()`, or a sigil (`$`, `@`, `%`) followed by a word character.
+ A valid sheet is written in one transaction. Partial sheets
 are fine; `fill` reports what remains empty, so agents can work in batches.
 
 ---
 
 ## 8. Skills
 
-Four skills ship in `share/skills/<name>/SKILL.md`:
+Five skills ship in `share/skills/<name>/SKILL.md`:
 
 | Skill | Does |
 |---|---|
-| `review-build` | `prune`, `build`, then fill the sheet until nothing remains. |
+| `review-notes` | Read before writing any code. While working, record a note with `review-helper note` whenever an assumption proves wrong, the work deviates from a plan or spec, a test exposes a misunderstanding, self-review corrects something, or a point deserves the reviewer's attention. Red for "check this", yellow for "worth knowing". |
+| `review-build` | `prune`, `build`, then fill the sheet until nothing remains: explanations, reading order, note placement, and the guide. Covers writing commentary for speech: refer to highlighted code, never quote it. |
 | `review-feedback` | Read `feedback`, change the code as new commits, `iterate`, then fill responses and new explanations. |
 | `review-requests` | Handle open requests: dispatch two sub-agents for each debate (one defending the target, one arguing against it or for an alternative) and record their cases; perform `split` and `check-split`. |
 | `review-cleanup` | `prune`, and report what it removed. |
@@ -421,6 +505,7 @@ lib/Review/Helper/CLI.pm             subcommand dispatch
 lib/Review/Helper/Repo.pm            git: locate repo, fixed-option diffs, blobs, refs
 lib/Review/Helper/DB.pm              connection, schema, migrations, txn helper
 lib/Review/Helper/Registry.pm        common-dir registry; prune
+lib/Review/Helper/Journal.pm         note recording; unplaced notes for the sheet
 lib/Review/Helper/Builder.pm         build and iterate
 lib/Review/Helper/Diff.pm            diff text -> hunks; line counts
 lib/Review/Helper/Split.pm           pick a splitter by kind; section attribution
@@ -434,7 +519,7 @@ lib/Review/Helper/Server.pm          PSGI app, routes, token
 scripts/review-helper
 share/html/index.html
 share/css/  share/js/  share/img/
-share/skills/{review-build,review-feedback,review-requests,review-cleanup}/
+share/skills/{review-notes,review-build,review-feedback,review-requests,review-cleanup}/
 ```
 
 Dependencies: Plack, Router::Simple, DBI, DBD::SQLite, PPI, File::ShareDir,

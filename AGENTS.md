@@ -56,13 +56,15 @@ CPAN distribution name: `Review-Helper`. Main module: `Review::Helper`
 
 ## Canonical sources of truth
 
-1. **`project`** — the owner's specification. It stands in for
-   `ARCHITECTURE.md` until one is written.
-2. **`AGENTS_OVERRIDE.md`** — this project's declarations and overrides.
-3. **This file** — project context and conventions.
+1. **`ARCHITECTURE.md`** — the authoritative design.
+2. **`RULINGS.md`** — owner decisions and their reasons. Read it when a
+   decision is in front of you.
+3. **`AGENTS_OVERRIDE.md`** — this project's declarations and overrides.
+4. **This file** — project context and conventions.
 
-If you are about to implement something that seems to conflict with
-`project`, stop and verify.
+`project` is the owner's original brief; `ARCHITECTURE.md` supersedes it. If
+you are about to implement something that seems to conflict with
+`ARCHITECTURE.md`, stop and verify.
 
 ---
 

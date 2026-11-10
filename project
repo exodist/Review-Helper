@@ -1,0 +1,151 @@
+This project is to write a perl application Review::Helper.
+
+This is a web app written in perl, Plack (Router::Simple), with the web theming
+modeled after the Test2-Harness-UI theming (Look at html, css, js there for
+examples).
+
+Use Role::Tiny for roles, Object::HashBase for objects, Test2::V0 for tests.
+
+The goal is to help a human review code written by an AI/LLM agent.
+
+When an agent completes a change (commit, branch, PR, etc) it can be asked to
+produce a datafile (tarball? Json, SQLite?) that the web-app will be able to
+render in the app.
+
+We need a skill for Agents to produce the data file, some of it can be easily
+coded, but some of it needs an agent to fill in.
+
+Ultimately a human will run a command, like `review-helper data_file` and it
+will launch the web server and provide the port (possibly even open the
+browser)
+
+The idea is a page where you start with the highest level explanation of what
+is being reviewed, an agent summary of what the code does, why it does it and
+how it does it. Simple short peragraphs with little redundancy, and bullet
+lists for easy digesting.
+
+Below this (after a page break) Will be a list of "units", if it is a branch or multi-commit PR or similar than each unit will be the commit name and a breif explanation of the commit (possibly the commit message, possibly more or less verbose.).  The goal is that each unit should be fully viewable with no scrolling on a tablet or monitor, a phone screen is small enough that we do not need to enforce a fit. This is a "rough" guide, some commits may need to be larger at agents discression, it s a goal, not a hard rule.
+
+Commits will be in order, first commit first, commits that come after the first come after it. Each seperated by a page break.
+
+The left should be an tree index.
+
+    summary
+    commit 1
+    commit 2
+    ....
+
+It can be used to jump to a specific section on the page.
+
+When in a section, such as on a commit, the left index/tree should expand and show additional details, that is files modified:
+
+    summary
+    commit 1
+     - foo.pm
+     - bar.pm
+     - baz.pm
+     ...
+    commit 2
+
+When on the section (commit 1) it shows the commit details (or commit message). The section on the tree is automatically expanded, and scrolled right if needed to see it. The navigation bar can be resized or minimized/pulkled back out as needed.
+
+New files are green, deleted files are red, files that shrank should be blue, and files that grew should be purple.
+
+Clicking a file replaces the section that had the commit summary with a summary of what changed in the file, and expand the tree to show methods/functions and other changes:
+
+    summary
+    commit 1
+     - foo.pm
+        - [header]
+        - do_foo()
+        - delete_foo()
+        - post_foo()
+        - get_foo()
+        - set_foo()
+        - [footer]
+        - [__END__]
+        ...
+     - bar.pm
+     - baz.pm
+     ...
+    commit 2
+
+Clicking on a function/method/subroutine or special section (header, __END__, etc) will bring up an AI/LLM summary of what changed in that section.
+
+You can always click back a level (or back button) to go back closer to the root of the tree.
+
+Next to each item in the tree, as well as a widget in the section being viewed,
+should be icons to view the diff (diff of the commit, diff of the file, diff of
+the function, etc). As well as to view the file as it is after the commit
+without the diff (view file, etc).
+
+Syntax and diff highlighting, as well as the ability to switch between unified and side-by-side diffs.
+
+The AI/LLM summaries for the file/package/module and subroutine level should
+also include things such as what object system was used (in langiages like perl
+where thats a choice, Moose, Object::HashBase, etc). What paradigms were uused
+(OOP, pure exporter, functional, lambda, etc). Lines added/removed/changed.
+
+One should also be able to add feedback on any line, or in commits as a whole.
+This feedback shoudl then be downloadable in a format where another skill
+defined by this project can be used by an agent to process and act on the
+feedback.
+
+For now we should target Perl, Javascript, CSS, HTML and agentic .md files.
+Though any file present in a commit should be listed, if it is an image we can
+render the image.
+
+The review file should hold the initial data provided by the agent producing the review, the feedback, and iterations so that history is preserved over the review as code is updated by agents based on feedback.
+
+There should also be a toggle or widget or affordance where as human can ask "I
+want the AI to dispatch 2 sub-agents to argue, one trying to justify this
+commit or file or method, and the other trying to argue against it (or for an
+alternative).". That will flag it in the review file so that the human can use
+the proper skill to read the file, find these argument spots, do distpatch the
+agents, then put the results in the review file for the human to read int he
+app.
+
+------
+
+The idea is to help the human with an easier way to view the changes and do code review, where the human can focus on the overall design and concepts, and only need to visit the actual diff or code when the details matter, or when he questions a decision, summary, or size of the change.  Important things like function names and filenames are easy to glance at.
+
+From the top down there are sections, then each section can be broken out into further sections.
+
+Opening 1 file in the commit will replace the commit's secgtion with that file, opening a second expands that commit to 2 sections one for each file, same for methods below that, then one can also go back to the commit.
+
+SO page diagram:
+
+    | summary
+    ---------
+    | commit 1
+    ---------
+    commit 2 (hidden) < | file A
+    ---------
+    commit 3 (hidden) < | file A
+                        | file B
+    commit 4 (hidden) < file A (hidden) < | method_a
+                                          | method_b
+                      file B (hidden)
+
+With the above, scrolling down the page will take you from summary, to commit 1 summary, to commit 2's file A, then commit 3's Files A, then B, then Commit 4's file A method A, then method_b, then file b, then on to commit 5' section
+
+Each section is like a horizontal scroll, left is higher level, right is deeper level, if multiple items on a deeper level are opened then the section can expand vertically to accomodate. Each section remembers where it is, but you can always open more (right) or collapse back to the left (by clicking the parent item).
+
+
+------
+
+Documentation for a function/method should be included with that
+function/method when clicking it. The agent skill to produce the review file
+should account for this, and also for perl mdouels where the method
+documentation is after the __END__ or not right next to the method, the rfeview
+file should still group them together, expanding a function/method should also
+expand its documentation. That only means it unit documentation, so if there is
+a documentation section just for it. This does not include things like a list
+of methods where it is included, or a code example for another method that also
+calls the method in question, etc.
+
+------
+
+Where possible the skills should use scripts or other tools to help build the
+review file, but an agent is needed to fill in any "what does this do, why, and
+how does it do it" information.

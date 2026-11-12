@@ -1,13 +1,20 @@
-# Build products (Dist::Zilla / ExtUtils::MakeMaker)
-/.build
-/Review-Helper*/
-/MANIFEST.bak
-/MYMETA.*
-/Makefile
-/Makefile.old
-/_eumm/
-/blib/
-/pm_to_blib
+# Build products (Dist::Zilla / ExtUtils::MakeMaker), built from perl/
+/perl/.build
+/perl/Review-Helper*/
+/perl/MANIFEST.bak
+/perl/MYMETA.*
+/perl/Makefile
+/perl/Makefile.old
+/perl/_eumm/
+/perl/blib/
+/perl/pm_to_blib
+# Written into perl/ from each build ([CopyFilesFromBuild]); the release
+# ships them in the distribution, not in git.
+/perl/LICENSE
+/perl/Makefile.PL
+/perl/README
+/perl/README.md
+/perl/cpanfile
 Build
 Build.bat
 MYMETA.*
@@ -33,9 +40,9 @@ nytprof.out
 *.ERR
 
 # Local-only test trees (see dist.ini exclusions)
-/pt/
-/tt/
-/xxx/
+/perl/pt/
+/perl/tt/
+/perl/xxx/
 
 # Test artifacts and logs
 *.test_info.json
@@ -43,14 +50,18 @@ nytprof.out
 .yath-persist.json
 .immiscible-test.lock
 /*.jsonl
+/perl/*.jsonl
 /*.gz
+/perl/*.gz
 /*.zip
+/perl/*.zip
 lastlog.*
 test-logs/
 
 # Agent working state
 /worktrees/
 /TEST_TIMING.md
+/perl/TEST_TIMING.md
 scratch
 
 # Reference trees, if the project keeps them untracked

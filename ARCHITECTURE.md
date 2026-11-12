@@ -956,8 +956,8 @@ Agent prose read aloud by the browser's Web Speech API (`speechSynthesis`,
 - A section's diff is built by one function from the file after the commit
   and the fixed-option hunks: every line of the section's `ranges` and
   `doc_ranges` (unchanged ones as context), the `-` lines Diff's attribution
-  gives it, in file order, as hunks labelled `part` `code` or `docs`; code
-  and documentation apart only by blank lines are one hunk. A section with
+  gives it, in file order, as hunks labelled `part` `code` or `docs`; runs
+  of either apart only by blank lines are one hunk. A section with
   no added or removed line has none.
 - Perl documentation is rendered with Pod::Simple::XHTML: no raw `html`
   targets, links reduced to their text, no element ids.

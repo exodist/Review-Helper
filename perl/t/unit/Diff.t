@@ -205,6 +205,26 @@ subtest section_hunks_blank_lines => sub {
     );
 };
 
+subtest section_hunks_same_part => sub {
+    my @new      = ('/** a */', '', '// b', '', 'function f() {', '  two', '}');
+    my $sections = [{ranges => [[5, 7]], doc_ranges => [[1, 1], [3, 3]]}];
+    my $hunks    = parse_diff("@@ -6,1 +6,1 @@\n-  one\n+  two\n")->{hunks};
+    is(
+        hunk_shape(section_hunks($hunks, \@new, $sections, 0)),
+        [['code', 1, 7, 1, 7, ' 1  2  3  4  5 -6 +6  7']],
+        'two documentation runs apart only by blank lines join, and join the code',
+    );
+
+    my @code      = ('sub f {', '    2;', '}', '', 'f();');
+    my $code_secs = [{ranges => [[1, 3], [5, 5]], doc_ranges => []}];
+    my $code_diff = parse_diff("@@ -2,1 +2,1 @@\n-    1;\n+    2;\n")->{hunks};
+    is(
+        hunk_shape(section_hunks($code_diff, \@code, $code_secs, 0)),
+        [['code', 1, 5, 1, 5, ' 1 -2 +2  3  4  5']],
+        'so do two code runs',
+    );
+};
+
 subtest section_hunks_apart => sub {
     my @new      = ('sub f {', '    2;', '}', '', 'sub g { }', '', '__END__', '', '=head2 f', '', 'Does f.', '');
     my $sections = [

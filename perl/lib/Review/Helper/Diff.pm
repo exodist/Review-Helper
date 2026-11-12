@@ -177,13 +177,13 @@ sub section_hunks($hunks, $new_lines, $sections, $index) {
     }
     return [] unless grep { $_->[0]->{type} ne ' ' } map { @$_ } @runs;
 
-    # Code and documentation next to each other, apart only by blank lines,
-    # read as one diff: the runs join, the blank lines as they are.
+    # Runs next to each other, apart only by blank lines, read as one diff:
+    # they join, the blank lines as they are.
     my @hunks = ([$runs[0]->[0]->[1], @{$runs[0]}]);
     for my $r (1 .. $#runs) {
         my ($run, $gap) = ($runs[$r], $gaps[$r]);
         my @blank = map { $_->[0] // {type => ' ', text => $new_lines->[$_->[3] - 1], old => $_->[2], new => $_->[3]} } @$gap;
-        if ($run->[0]->[1] ne $runs[$r - 1]->[0]->[1] && !grep { ($_->{text} // '') =~ m/\S/ } @blank) {
+        unless (grep { ($_->{text} // '') =~ m/\S/ } @blank) {
             my $merged = $hunks[-1];
             $merged->[0] = 'code' if $run->[0]->[1] eq 'code';
             push @$merged => (map { [$blank[$_], undef, @{$gap->[$_]}[2, 3]] } 0 .. $#blank), @$run;
@@ -444,10 +444,9 @@ C<\@new_lines>, the file after the change, one string per line), with the
 C<+> lines of C<\@hunks> and the C<-> lines C<line_owners> gives the
 section, in file order. Each unbroken run of one part is
 a hunk with a C<part> of C<code> or C<docs> and its own line numbers; lines
-between runs do not appear, except that a run of code and a run of
-documentation next to each other, with nothing or only blank lines between
-them, are one hunk that holds those blank lines as they are (context, or
-their C<+> or C<-> lines). A hunk's C<part> is C<code> when it holds any
+between runs do not appear, except that runs with nothing or only blank
+lines between them, code or documentation alike, are one hunk that holds
+those blank lines as they are (context, or their C<+> or C<-> lines). A hunk's C<part> is C<code> when it holds any
 code, C<docs> when it holds documentation alone. A removed line takes the
 part of the section's next line in its run, else the previous one, else
 C<code>. A deleted section shows its removed lines. Returns no hunks when the

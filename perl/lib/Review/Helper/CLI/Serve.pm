@@ -1,7 +1,7 @@
 package Review::Helper::CLI::Serve;
 use v5.36;
 
-our $VERSION = '0.001';
+our $VERSION = '0.002';
 
 use Capture::Tiny qw/capture_stdout/;
 use HTTP::Server::PSGI();

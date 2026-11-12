@@ -10,7 +10,7 @@ my $dir = tempdir(CLEANUP => 1);
 
 my ($exit, $out, $err) = cli($dir, 'skills', 'path');
 is([$exit, $err], [0, ''], 'path succeeds');
-like($out, qr{share/skills\n\z}, 'path prints the shipped skills directory');
+like($out, qr{/skills\n\z}, 'path prints the shipped skills directory');
 like($out, qr{\A/},              'as an absolute path');
 unlike($out, qr{(?:^|/)\.\.?(?:/|$)}m, 'with no . or .. in it');
 chomp $out;

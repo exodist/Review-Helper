@@ -566,9 +566,11 @@ their own (Flags).
   server's hunk JSON. Each line is its own row, so line feedback can attach to
   any of them.
 - A named unit's section diff is the whole unit and its whole documentation,
-  changes marked, as two parts (`code`, `docs`) with a separator row
-  ("documentation — lines A–B") and nothing from between them, even when the
-  docs sit far away (under `__END__`). Diffs always show documentation raw.
+  changes marked. Documentation next to the code (nothing or only blank
+  lines between) is one diff with it. Documentation apart from it, such as
+  under `__END__`, is a second part (`docs`) after a separator row
+  ("documentation — lines A–B"), with nothing from between them. Diffs
+  always show documentation raw.
 - The documentation beside a section's summary is Perl POD rendered to HTML
   by the server, when it is POD; other documentation shows as highlighted
   lines.
@@ -954,8 +956,9 @@ Agent prose read aloud by the browser's Web Speech API (`speechSynthesis`,
 - A section's diff is built by one function from the file after the commit
   and the fixed-option hunks: every line of the section's `ranges` and
   `doc_ranges` (unchanged ones as context), the `-` lines Diff's attribution
-  gives it, in file order, as hunks labelled `part` `code` or `docs`. A
-  section with no added or removed line has none.
+  gives it, in file order, as hunks labelled `part` `code` or `docs`; code
+  and documentation apart only by blank lines are one hunk. A section with
+  no added or removed line has none.
 - Perl documentation is rendered with Pod::Simple::XHTML: no raw `html`
   targets, links reduced to their text, no element ids.
 - Git reads run through list-form pipes, never a shell.

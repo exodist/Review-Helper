@@ -1,5 +1,8 @@
 {{$NEXT}}
 
+    - A section's diff no longer splits where only blank lines separate its
+      parts: documentation right next to its code shows in one diff with it.
+
 0.001     2026-11-12 13:34:14-08:00 America/Los_Angeles
 
     - Initial release.

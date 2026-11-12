@@ -1657,11 +1657,13 @@ try {
                 check(`${s.name} diff shows`, false, await hash());
                 continue;
             }
-            // New line numbers, one list per hunk.
-            const hunks = await js(`[...document.querySelectorAll('${sel} tr')].reduce((h, r) => (r.classList.contains('hunk') ? h.push([]) : r.dataset.new && h.at(-1).push(Number(r.dataset.new)), h), [])`);
-            const own = n => [...s.ranges, ...s.doc_ranges].some(([a, b]) => n >= a && n <= b);
-            check(`${s.name} diff shows only its lines`, hunks.flat().length > 0 && hunks.flat().every(own), hunks);
-            check(`${s.name} diff hunks are unbroken`, hunks.every(h => h.every((n, i) => !i || n === h[i - 1] + 1)), hunks);
+            // New line numbers, one list per hunk, a blank line's negated:
+            // blank lines it does not own may join its lines, between them.
+            const hunks = await js(`[...document.querySelectorAll('${sel} tr')].reduce((h, r) => (r.classList.contains('hunk') ? h.push([]) : r.dataset.new && h.at(-1).push(Number(r.dataset.new) * (r.lastElementChild.textContent.trim() ? 1 : -1)), h), [])`);
+            const owns = n => [...s.ranges, ...s.doc_ranges].some(([a, b]) => Math.abs(n) >= a && Math.abs(n) <= b);
+            const own = h => h.every((n, i) => owns(n) || n < 0 && h.slice(0, i).some(owns) && h.slice(i + 1).some(owns));
+            check(`${s.name} diff shows only its lines`, hunks.flat().length > 0 && hunks.every(own), hunks);
+            check(`${s.name} diff hunks are unbroken`, hunks.every(h => h.every((n, i) => !i || Math.abs(n) === Math.abs(h[i - 1]) + 1)), hunks);
         }
     }
 
@@ -1695,6 +1697,16 @@ try {
         && await layout() === 'radio:true:0,radio:false:-1', await layout());
     check('the documentation beside the summary is rendered POD', await waitFor(`${q(`#s${s22} .docs .pod h2`)}?.textContent === 'name' && ${q(`#s${s22} .docs .pod code`)}?.textContent === 'anon' && !${q(`#s${s22} .docs table`)}`));
     await shot('11-unit-diff');
+
+    // ---- documentation right above the code: one diff with it ----
+    const join = (await sections(f5)).find(s => s.name === 'export function join');
+    const sJoin = join.id;
+    const joinLines = [...join.doc_ranges, ...join.ranges].flatMap(([a, b]) => Array.from({ length: b - a + 1 }, (_, k) => a + k));
+    await load(`#at=s${sJoin}&c${c2}=f${f5},s${sJoin}~d`);
+    const joinSel = `#s${sJoin} .panel table.diff`;
+    await waitFor(`!!${q(joinSel)}`);
+    rows = await unitRows(joinSel);
+    check('documentation right above the code is one diff with it, no separator', join.doc_ranges.length && JSON.stringify(rows) === JSON.stringify(['hunk', ...joinLines]), { rows, joinLines });
 
     // ---- each level's header sticks while its level is on screen ----
     // Each header's [top, bottom, whether it is what shows at its middle].

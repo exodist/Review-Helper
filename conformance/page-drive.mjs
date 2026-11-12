@@ -1658,10 +1658,11 @@ try {
                 continue;
             }
             // New line numbers, one list per hunk, a blank line's negated:
-            // blank lines join code and documentation next to each other.
+            // blank lines it does not own may join its lines, between them.
             const hunks = await js(`[...document.querySelectorAll('${sel} tr')].reduce((h, r) => (r.classList.contains('hunk') ? h.push([]) : r.dataset.new && h.at(-1).push(Number(r.dataset.new) * (r.lastElementChild.textContent.trim() ? 1 : -1)), h), [])`);
-            const own = n => n < 0 || [...s.ranges, ...s.doc_ranges].some(([a, b]) => n >= a && n <= b);
-            check(`${s.name} diff shows only its lines`, hunks.flat().length > 0 && hunks.flat().every(own), hunks);
+            const owns = n => [...s.ranges, ...s.doc_ranges].some(([a, b]) => Math.abs(n) >= a && Math.abs(n) <= b);
+            const own = h => h.every((n, i) => owns(n) || n < 0 && h.slice(0, i).some(owns) && h.slice(i + 1).some(owns));
+            check(`${s.name} diff shows only its lines`, hunks.flat().length > 0 && hunks.every(own), hunks);
             check(`${s.name} diff hunks are unbroken`, hunks.every(h => h.every((n, i) => !i || Math.abs(n) === Math.abs(h[i - 1]) + 1)), hunks);
         }
     }

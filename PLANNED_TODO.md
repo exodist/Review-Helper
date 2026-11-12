@@ -164,3 +164,39 @@ and reviewed marks. Owner agreed the evaluation's defaults:
   restart. Plain HTTP: tokens are sniffable on the LAN; use HTTPS via a
   proxy or an SSH tunnel beyond a trusted network. Loopback is always the
   owner (local users are trusted, per the earlier ruling).
+
+## Mechanical change groups (phase not decided)
+
+Owner, 2026-11-12: a mechanical change (a rename, an import or version line)
+often makes the same one or two line edit in many files. Stepping through a
+hundred files of two lines each is a pain when they all hold the same
+change. Agreed design:
+
+- The backend finds the groups. When it builds or iterates, it reduces each
+  hunk to its `-` and `+` lines (no context, no line numbers); hunks the
+  same in enough files form a group. A group holds only hunks the backend
+  checked, so a change that is not mechanical cannot hide in one. Owner,
+  2026-11-12: backend only to start; agents may propose groups (still
+  checked by the backend, as substitution groups below) only if real
+  reviews show the backend misses too much.
+- A `mechanical` sheet item per group: the agent writes its name, what and
+  why, or declines it, which returns its hunks to normal review.
+- The page shows a group first, at commit (or topic) level before the
+  files: the explanation, one diff that is right for every file apart from
+  line numbers, and the list of files. Its `diff` tab shows every file's
+  real hunks.
+- Grouped hunks leave the other diffs and sections. A file changed only by
+  grouped hunks gets no row, sections or split of its own; it is listed
+  under its group. A file with other changes keeps its row, with a note
+  naming the group.
+- Flags, feedback and guide steps can target a group, or one member's line.
+  Membership is found again each iteration; the text carries forward while
+  the reduced change stays the same.
+- Later, if needed: substitution groups, where the agent states a rule
+  (`from` to `to` on each line) and the backend checks every `-` line turns
+  into its `+` line; hunks that do not fit go to normal review.
+
+Open: how many files make a group (deferred) and when to build it. Touches
+FORMAT.md (a table, the sheet item, split rules), API.md (groups in the
+commit JSON; diffs leaving grouped hunks out), the Perl backend, the page,
+the review-build skill and the conformance checks.

@@ -32,10 +32,12 @@ var commands map[string]command
 func init() {
 	commands = map[string]command{
 		"close":     runClose,
+		"fill":      runFill,
 		"list":      runList,
 		"note":      runNote,
 		"prune":     runPrune,
 		"published": runPublished,
+		"sheet":     runSheet,
 		"skills":    runSkills,
 		"version":   runVersion,
 	}

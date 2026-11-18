@@ -9,6 +9,7 @@ use Fcntl qw/:flock O_RDWR O_CREAT/;
 use File::Basename qw/dirname/;
 use File::Path qw/make_path/;
 use File::Spec();
+use Path::Tiny();
 
 use Review::Helper::Util qw/json_encode json_decode/;
 
@@ -19,7 +20,7 @@ use Object::HashBase qw{
 
 sub init($self) {
     croak "'repo' is a required attribute" unless $self->{+REPO};
-    $self->{+PATH} //= $self->{+REPO}->shared_state_dir . '/registry.json';
+    $self->{+PATH} //= Path::Tiny::path($self->{+REPO}->shared_state_dir)->child('registry.json')->stringify;
 }
 
 sub close_review($self, $db, $path) {

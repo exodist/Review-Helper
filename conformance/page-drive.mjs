@@ -1695,7 +1695,14 @@ try {
     await arrow('ArrowRight');
     check('an arrow key picks unified, which takes the focus', await waitFor(`!!${q(unitSel + '.unified')} && document.activeElement === ${q('#diff_toggle button[data-value="unified"]')}`)
         && await layout() === 'radio:true:0,radio:false:-1', await layout());
-    check('the documentation beside the summary is rendered POD', await waitFor(`${q(`#s${s22} .docs .pod h2`)}?.textContent === 'name' && ${q(`#s${s22} .docs .pod code`)}?.textContent === 'anon' && !${q(`#s${s22} .docs table`)}`));
+    // doc_html is optional (API.md): rendered when the backend sends it, else
+    // the documentation's lines.
+    if ((await sections(f4)).find(s => s.id === s22).doc_html != null) {
+        check('the documentation beside the summary is rendered POD', await waitFor(`${q(`#s${s22} .docs .pod h2`)}?.textContent === 'name' && ${q(`#s${s22} .docs .pod code`)}?.textContent === 'anon' && !${q(`#s${s22} .docs table`)}`));
+    }
+    else {
+        check('the documentation beside the summary is its lines', await waitFor(`!${q(`#s${s22} .docs .pod`)} && !!${q(`#s${s22} .docs table`)} && ${q(`#s${s22} .docs table`)}.textContent.includes('Returns the name, or C<anon>.')`));
+    }
     await shot('11-unit-diff');
 
     // ---- documentation right above the code: one diff with it ----

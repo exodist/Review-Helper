@@ -39,6 +39,7 @@ func init() {
 		"note":      runNote,
 		"prune":     runPrune,
 		"published": runPublished,
+		"serve":     runServe,
 		"skills":    runSkills,
 		"version":   runVersion,
 	}

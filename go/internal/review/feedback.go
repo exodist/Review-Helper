@@ -277,3 +277,34 @@ func runFeedback(args []string, out io.Writer) error {
 	_, err = out.Write(b)
 	return err
 }
+
+// addFeedback stores new, open feedback: its anchor, body and reviewer.
+func addFeedback(q querier, f *Feedback) (int64, error) {
+	t := now()
+	res, err := q.Exec(`INSERT INTO feedback (iteration, target, revision, path, section_name, section_package, topic, flag, flag_sentence, line, side, body, reviewer, created, updated, status)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')`,
+		f.Iteration, f.Target, f.Revision, f.Path, f.SectionName, f.SectionPackage, f.Topic, f.Flag, f.FlagSentence, f.Line, f.Side, f.Body, f.Reviewer, t, t)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// UpdateFeedback sets a feedback's body, status or both; nil leaves one as
+// it is.
+func (d *DB) UpdateFeedback(id int64, body, status *string) error {
+	_, err := d.Exec("UPDATE feedback SET body = COALESCE(?, body), status = COALESCE(?, status), updated = ? WHERE id = ?", body, status, now(), id)
+	return err
+}
+
+// AddRequest stores a new, open request: its kind, anchor, note and
+// reviewer.
+func (d *DB) AddRequest(r *Request) (int64, error) {
+	res, err := d.Exec(`INSERT INTO request (iteration, kind, target, revision, path, section_name, section_package, topic, note, reviewer, created, status)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')`,
+		r.Iteration, r.Kind, r.Target, r.Revision, r.Path, r.SectionName, r.SectionPackage, r.Topic, r.Note, r.Reviewer, now())
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}

@@ -218,6 +218,17 @@ func (d *DB) Files(commitID int64) ([]*FileChange, error) {
 	return queryAll(d, scanFile, "SELECT "+fileCols+" FROM file_change WHERE commit_id = ? ORDER BY id", commitID)
 }
 
+// CommitsByRevision lists an iteration's entries with a revision: one, or
+// in a squashed iteration split into topics, one per topic.
+func (d *DB) CommitsByRevision(iteration int64, revision string) ([]*CommitEntry, error) {
+	return queryAll(d, scanCommit, "SELECT "+commitCols+" FROM commit_entry WHERE iteration = ? AND revision = ? ORDER BY position", iteration, revision)
+}
+
+// FileByPath is the entry's file change at path, or nil.
+func (d *DB) FileByPath(commitID int64, path string) (*FileChange, error) {
+	return queryOne(d, scanFile, "SELECT "+fileCols+" FROM file_change WHERE commit_id = ? AND path = ?", commitID, path)
+}
+
 // File is the file change with id, or nil.
 func (d *DB) File(id int64) (*FileChange, error) {
 	return queryOne(d, scanFile, "SELECT "+fileCols+" FROM file_change WHERE id = ?", id)
@@ -263,11 +274,15 @@ func (d *DB) FlagSeen(iteration int64) ([]*FlagSeen, error) {
 // SetFlagSeen sets or removes a reviewer's mark; a mark already there keeps
 // its time.
 func (d *DB) SetFlagSeen(flag int64, reviewer string, seen bool) error {
+	return setFlagSeen(d, flag, reviewer, seen)
+}
+
+func setFlagSeen(q querier, flag int64, reviewer string, seen bool) error {
 	var err error
 	if seen {
-		_, err = d.Exec("INSERT OR IGNORE INTO flag_seen (flag, reviewer, at) VALUES (?, ?, ?)", flag, reviewer, now())
+		_, err = q.Exec("INSERT OR IGNORE INTO flag_seen (flag, reviewer, at) VALUES (?, ?, ?)", flag, reviewer, now())
 	} else {
-		_, err = d.Exec("DELETE FROM flag_seen WHERE flag = ? AND reviewer = ?", flag, reviewer)
+		_, err = q.Exec("DELETE FROM flag_seen WHERE flag = ? AND reviewer = ?", flag, reviewer)
 	}
 	return err
 }

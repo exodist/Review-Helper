@@ -92,7 +92,9 @@ subtest 'odd PATH entries' => sub {
     chmod(0000, $locked) or die "Could not chmod: $!";
     my $missing = "$empty/no-such-dir";
 
-    is([run_with(undef, ['', $missing, $locked, $late], 'list')], [$< == 0 ? "locked\nlist\n" : "go\nlist\n", 3, ''], 'empty, missing and unreadable directories are skipped');
+    # Root, or an administrator on Cygwin, still reads it.
+    my $readable = opendir(my $dh, $locked);
+    is([run_with(undef, ['', $missing, $locked, $late], 'list')], [$readable ? "locked\nlist\n" : "go\nlist\n", 3, ''], 'empty, missing and unreadable directories are skipped');
     chmod(0700, $locked);
 
     # '.' is the directory the dispatcher runs in.

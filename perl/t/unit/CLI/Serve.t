@@ -308,11 +308,12 @@ subtest listen => sub {
 subtest http => sub {
     my $socket = Review::Helper::CLI::Serve->listen_socket(0);
     my $port   = $socket->sockport;
-    my $app    = Review::Helper::Server->new(db_path => $file)->to_app;
 
+    # The child opens the review itself: a SQLite connection must not cross a
+    # fork (Cygwin's reports a disk I/O error).
     my $pid = fork // die "fork failed: $!";
     unless ($pid) {
-        HTTP::Server::PSGI->new(listen_sock => $socket)->run($app);
+        HTTP::Server::PSGI->new(listen_sock => $socket)->run(Review::Helper::Server->new(db_path => $file)->to_app);
         exit 0;
     }
     close($socket);

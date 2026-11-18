@@ -135,8 +135,12 @@ func (n *Note) validate() error {
 	return nil
 }
 
-// Journal is a worktree's journal file.
-type Journal struct{ Path string }
+// Journal is a worktree's journal file. Warn, when set, gets a line for each
+// line of the file skipped as not a note.
+type Journal struct {
+	Path string
+	Warn io.Writer
+}
 
 // lock holds an flock on f until it is closed.
 func lock(f *os.File, exclusive bool) error {
@@ -226,7 +230,9 @@ func (j *Journal) decode(line []byte, number int) *Note {
 			return &n
 		}
 	}
-	fmt.Fprintf(os.Stderr, "skipping line %d of journal %s: not a note\n", number, j.Path)
+	if j.Warn != nil {
+		fmt.Fprintf(j.Warn, "skipping line %d of journal %s: not a note\n", number, j.Path)
+	}
 	return nil
 }
 

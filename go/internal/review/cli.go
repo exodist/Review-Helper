@@ -22,8 +22,9 @@ import (
 
 // The command line (standards/CLI.md).
 
-// A command parses its own options and runs, writing what it prints to out.
-type command func(args []string, out io.Writer) error
+// A command parses its own options and runs, writing what it prints to out
+// and its warnings to warn.
+type command func(args []string, out, warn io.Writer) error
 
 // commands is filled in init: it refers to functions that refer back to it
 // (usage), so it cannot be initialized in its declaration.
@@ -69,7 +70,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	var out bytes.Buffer
-	if err := run(args, &out); err != nil {
+	if err := run(args, &out, stderr); err != nil {
 		fmt.Fprintf(stderr, "review-helper %s: %s\n", name, strings.TrimSuffix(err.Error(), "\n"))
 		return 1
 	}
@@ -164,16 +165,16 @@ func cwdRepo() (*git.Repo, error) {
 	return git.Find(dir)
 }
 
-// journalOf is the journal of repo's worktree.
-func journalOf(repo *git.Repo) (*Journal, error) {
+// journalOf is the journal of repo's worktree, warning on warn.
+func journalOf(repo *git.Repo, warn io.Writer) (*Journal, error) {
 	dir, err := repo.StateDir()
 	if err != nil {
 		return nil, err
 	}
-	return &Journal{Path: filepath.Join(dir, "journal.jsonl")}, nil
+	return &Journal{Path: filepath.Join(dir, "journal.jsonl"), Warn: warn}, nil
 }
 
-func runNote(args []string, out io.Writer) error {
+func runNote(args []string, out, warn io.Writer) error {
 	var flag, kind, path, unit, snippet, sentence, detail string
 	o := newOptions()
 	for name, p := range map[string]*string{"flag": &flag, "kind": &kind, "path": &path, "unit": &unit, "snippet": &snippet, "sentence": &sentence, "detail": &detail} {
@@ -190,7 +191,7 @@ func runNote(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	j, err := journalOf(repo)
+	j, err := journalOf(repo, warn)
 	if err != nil {
 		return err
 	}
@@ -207,7 +208,7 @@ func runNote(args []string, out io.Writer) error {
 	return nil
 }
 
-func runList(args []string, out io.Writer) error {
+func runList(args []string, out, warn io.Writer) error {
 	if len(args) > 0 {
 		return errors.New("usage: review-helper list")
 	}
@@ -230,7 +231,7 @@ func runList(args []string, out io.Writer) error {
 	return nil
 }
 
-func runPrune(args []string, out io.Writer) error {
+func runPrune(args []string, out, warn io.Writer) error {
 	var dryRun bool
 	o := newOptions()
 	o.flag("dry-run", &dryRun)
@@ -255,7 +256,7 @@ func runPrune(args []string, out io.Writer) error {
 	return nil
 }
 
-func runClose(args []string, out io.Writer) error {
+func runClose(args []string, out, warn io.Writer) error {
 	if len(args) != 1 {
 		return errors.New("usage: review-helper close FILE")
 	}
@@ -273,7 +274,7 @@ func runClose(args []string, out io.Writer) error {
 
 var positiveInt = regexp.MustCompile(`^[1-9][0-9]*$`)
 
-func runPublished(args []string, out io.Writer) error {
+func runPublished(args []string, out, warn io.Writer) error {
 	if len(args) != 2 {
 		return errors.New("usage: review-helper published FILE ID")
 	}
@@ -292,7 +293,7 @@ func runPublished(args []string, out io.Writer) error {
 	return d.SetPublished(id)
 }
 
-func runSkills(args []string, out io.Writer) error {
+func runSkills(args []string, out, warn io.Writer) error {
 	if len(args) != 1 || args[0] != "path" {
 		return errors.New("usage: review-helper skills path")
 	}
@@ -304,7 +305,7 @@ func runSkills(args []string, out io.Writer) error {
 	return nil
 }
 
-func runVersion(args []string, out io.Writer) error {
+func runVersion(args []string, out, warn io.Writer) error {
 	if len(args) > 0 {
 		return errors.New("usage: review-helper version")
 	}

@@ -230,7 +230,7 @@ func (d *DB) flagLines() (flagLines, error) {
 	return lines, rows.Err()
 }
 
-func runFeedback(args []string, out io.Writer) error {
+func runFeedback(args []string, out, warn io.Writer) error {
 	var open, publish bool
 	o := newOptions()
 	o.flag("open", &open)

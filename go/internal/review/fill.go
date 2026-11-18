@@ -599,7 +599,7 @@ func fileRange(f *sheetFile, side string, raw json.RawMessage) (Range, string) {
 	return r, ""
 }
 
-func runFill(args []string, out io.Writer) error {
+func runFill(args []string, out, warn io.Writer) error {
 	o := newOptions()
 	rest, err := o.parse(args)
 	if err != nil {
@@ -622,7 +622,7 @@ func runFill(args []string, out io.Writer) error {
 		var probe any
 		return fmt.Errorf("'%s' is not valid JSON: %v", sheetFile, json.Unmarshal(data, &probe))
 	}
-	d, repo, j, err := openReview(file)
+	d, repo, j, err := openReview(file, warn)
 	if err != nil {
 		return err
 	}

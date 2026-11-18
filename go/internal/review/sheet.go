@@ -835,12 +835,12 @@ func BuildSheet(d *DB, repo *git.Repo, j *Journal, all bool) (*Sheet, error) {
 }
 
 // openReview opens a review file with its repository and journal.
-func openReview(file string) (*DB, *git.Repo, *Journal, error) {
+func openReview(file string, warn io.Writer) (*DB, *git.Repo, *Journal, error) {
 	repo, err := git.Find(file)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	j, err := journalOf(repo)
+	j, err := journalOf(repo, warn)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -851,7 +851,7 @@ func openReview(file string) (*DB, *git.Repo, *Journal, error) {
 	return d, repo, j, nil
 }
 
-func runSheet(args []string, out io.Writer) error {
+func runSheet(args []string, out, warn io.Writer) error {
 	var all bool
 	o := newOptions()
 	o.flag("all", &all)
@@ -862,7 +862,7 @@ func runSheet(args []string, out io.Writer) error {
 	if len(rest) != 1 {
 		return errors.New("usage: review-helper sheet [--all] FILE")
 	}
-	d, repo, j, err := openReview(rest[0])
+	d, repo, j, err := openReview(rest[0], warn)
 	if err != nil {
 		return err
 	}

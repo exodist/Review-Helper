@@ -221,7 +221,7 @@ func otherVersion(why string, args ...any) error {
 	return fmt.Errorf("this review export was built by a different version of review-helper; export it again with this version, or import it with the version that built it (%s)", fmt.Sprintf(why, args...))
 }
 
-func runExport(args []string, out io.Writer) error {
+func runExport(args []string, out, warn io.Writer) error {
 	var outPath string
 	o := newOptions()
 	o.path("out", &outPath)

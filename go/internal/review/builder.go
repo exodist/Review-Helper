@@ -48,21 +48,22 @@ type builder struct {
 	repo    *git.Repo
 	db      *DB
 	journal *Journal
+	warn    io.Writer
 }
 
-func newBuilder(repo *git.Repo) (*builder, error) {
-	j, err := journalOf(repo)
+func newBuilder(repo *git.Repo, warn io.Writer) (*builder, error) {
+	j, err := journalOf(repo, warn)
 	if err != nil {
 		return nil, err
 	}
-	return &builder{repo: repo, journal: j}, nil
+	return &builder{repo: repo, journal: j, warn: warn}, nil
 }
 
-func warnf(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, "review-helper: "+format+"\n", args...)
+func (b *builder) warnf(format string, args ...any) {
+	fmt.Fprintf(b.warn, format+"\n", args...)
 }
 
-func runBuild(args []string, out io.Writer) error {
+func runBuild(args []string, out, warn io.Writer) error {
 	var base, head, title, source, file string
 	var squash bool
 	var paths []string
@@ -88,7 +89,7 @@ func runBuild(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	b, err := newBuilder(repo)
+	b, err := newBuilder(repo, warn)
 	if err != nil {
 		return err
 	}
@@ -103,7 +104,7 @@ func runBuild(args []string, out io.Writer) error {
 	return nil
 }
 
-func runIterate(args []string, out io.Writer) error {
+func runIterate(args []string, out, warn io.Writer) error {
 	var base, head string
 	o := newOptions()
 	o.str("base", &base)
@@ -128,7 +129,7 @@ func runIterate(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	b, err := newBuilder(repo)
+	b, err := newBuilder(repo, warn)
 	if err != nil {
 		return err
 	}
@@ -170,10 +171,10 @@ func (b *builder) build(req buildRequest) (string, error) {
 			return "", err
 		}
 	}
-	if file, err = resolveFile(file); err != nil {
+	if file, err = absReviewPath(file); err != nil {
 		return "", err
 	}
-	if err := b.checkLocation(file); err != nil {
+	if err := checkReviewLocation(b.repo, file); err != nil {
 		return "", err
 	}
 	if !utf8.ValidString(file) {
@@ -615,7 +616,7 @@ func (b *builder) store(number int64, sp *span, entries []*newEntry) error {
 			ids[i] = n.ID.Value
 		}
 		if err := b.journal.Remove(ids...); err != nil {
-			warnf("could not remove the stored journal entries from the journal: %v", err)
+			b.warnf("could not remove the stored journal entries from the journal: %v", err)
 		}
 	}
 	return nil
@@ -634,7 +635,7 @@ func (b *builder) journalEntries() ([]*Note, error) {
 			continue
 		}
 		if problem := n.Problem(); problem != "" {
-			warnf("skipping journal entry %s: %s", n.ID.Value, problem)
+			b.warnf("skipping journal entry %s: %s", n.ID.Value, problem)
 			continue
 		}
 		entries = append(entries, n)
@@ -776,31 +777,4 @@ func reviewFileName(revision, name string) string {
 		return short
 	}
 	return strings.ReplaceAll(name, "/", "-")
-}
-
-// resolveFile makes file absolute, its directory's symbolic links resolved
-// when the directory exists.
-func resolveFile(file string) (string, error) {
-	abs, err := filepath.Abs(file)
-	if err != nil {
-		return "", err
-	}
-	dir := filepath.Dir(abs)
-	if st, err := os.Stat(dir); err != nil || !st.IsDir() {
-		return abs, nil
-	}
-	real, err := filepath.EvalSymlinks(dir)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(real, filepath.Base(abs)), nil
-}
-
-// checkLocation refuses a review file outside both the VCS's own
-// directories and the worktree.
-func (b *builder) checkLocation(file string) error {
-	if b.repo.IsInternalPath(file) || git.Within(b.repo.Root, file) {
-		return nil
-	}
-	return fmt.Errorf("review file '%s' is not inside the worktree '%s'", file, b.repo.Root)
 }

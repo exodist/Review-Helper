@@ -272,31 +272,6 @@ func importName(x *ReviewExport, name string) string {
 	return s
 }
 
-// absReviewPath is path made absolute, its directory's symbolic links
-// resolved when the directory exists.
-func absReviewPath(path string) (string, error) {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return "", err
-	}
-	dir, base := filepath.Split(abs)
-	if st, err := os.Stat(dir); err == nil && st.IsDir() {
-		if real, err := filepath.EvalSymlinks(dir); err == nil {
-			return filepath.Join(real, base), nil
-		}
-	}
-	return abs, nil
-}
-
-// checkReviewLocation refuses a review file outside both the worktree and
-// the VCS's own directories.
-func checkReviewLocation(repo *git.Repo, path string) error {
-	if repo.IsInternalPath(path) || git.Within(repo.Root, path) {
-		return nil
-	}
-	return fmt.Errorf("review file '%s' is not inside the worktree '%s'", path, repo.Root)
-}
-
 // openSameReview opens an existing file to merge into, which must hold the
 // review.
 func openSameReview(path, id string) (*DB, error) {
@@ -531,7 +506,7 @@ func checkReferences(tx *sql.Tx) error {
 	return fmt.Errorf("table '%s' has a row that refers to a missing '%s' row", table, parent)
 }
 
-func runImport(args []string, out io.Writer) error {
+func runImport(args []string, out, warn io.Writer) error {
 	var file string
 	o := newOptions()
 	o.path("file", &file)
@@ -567,7 +542,7 @@ func runImport(args []string, out io.Writer) error {
 	}
 	fmt.Fprintln(out, res.Path)
 	for _, it := range res.Missing {
-		fmt.Fprintf(os.Stderr, "Iteration %d: commit %s is not in this repository; fetch it to view that iteration.\n", it.Number, it.Head)
+		fmt.Fprintf(warn, "Iteration %d: commit %s is not in this repository; fetch it to view that iteration.\n", it.Number, it.Head)
 	}
 	return nil
 }

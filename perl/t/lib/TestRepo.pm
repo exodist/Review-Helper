@@ -9,6 +9,9 @@ use File::Path qw/make_path/;
 use File::Temp qw/tempdir/;
 use Cwd qw/abs_path/;
 
+# A tester's own identity in the environment overrides the test repository's.
+delete @ENV{qw/GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_AUTHOR_DATE GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL GIT_COMMITTER_DATE/};
+
 # A throwaway repository in a temp dir, isolated from user and system git config.
 sub make_repo() {
     my $dir = abs_path(tempdir(CLEANUP => 1));

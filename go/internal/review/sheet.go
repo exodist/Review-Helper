@@ -580,13 +580,6 @@ func sectionItem(e *sheetCommit, f *sheetFile, s *Section, squashed bool) *sheet
 	}
 }
 
-func orEmpty(r Ranges) Ranges {
-	if r == nil {
-		return Ranges{}
-	}
-	return r
-}
-
 // splitItem is nil for a file with nothing to split: deleted, image or
 // binary, or a rename or mode change alone. It is required while the file
 // has no split (optional in a squashed iteration) and while a split

@@ -43,11 +43,15 @@ func init() {
 		"note":      runNote,
 		"prune":     runPrune,
 		"published": runPublished,
+		"serve":     runServe,
 		"sheet":     runSheet,
 		"skills":    runSkills,
 		"version":   runVersion,
 	}
 }
+
+// streaming commands print as they run instead of when they succeed.
+var streaming = map[string]bool{"serve": true}
 
 // Run runs a command line and returns the exit status. A command's output
 // is held until it succeeds, so one that fails prints nothing on standard
@@ -68,6 +72,14 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if run == nil {
 		fmt.Fprintf(stderr, "review-helper: unknown command %q\n%s", name, usage())
 		return 1
+	}
+	// A command that runs until stopped, as serve does, prints as it goes.
+	if streaming[name] {
+		if err := run(args, stdout, stderr); err != nil {
+			fmt.Fprintf(stderr, "review-helper %s: %s\n", name, strings.TrimSuffix(err.Error(), "\n"))
+			return 1
+		}
+		return 0
 	}
 	var out bytes.Buffer
 	if err := run(args, &out, stderr); err != nil {

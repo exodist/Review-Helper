@@ -1,17 +1,19 @@
 // Build a fixture review for the page drive (page-drive.mjs): a throwaway
 // git repository in DIR and a filled review of it, made with the
 // review-helper command (bin/review-helper, so REVIEW_HELPER_IMPL picks the
-// backend) and its HTTP API, plus a few rows the format allows but no
-// command writes, put straight into the review file. Prints the review
-// file's path; it does not serve it. With --topics, the review is a squashed
-// one split into two topics. This file is the authoritative description of
+// backend) and its HTTP API. Then it edits the review file directly: it
+// adds a few rows the format allows but no command or route writes, and
+// adjusts some the API wrote (clearing reviewers, setting a section,
+// removing a seen mark) where the fixture needs what no route makes. Prints
+// the review file's path; it does not serve it. With --topics, the review is
+// a squashed one split into two topics. This file is the authoritative description of
 // the fixtures' content; conformance/README.md, "Fixtures", says how to use it.
 //
 // Usage: node conformance/fixtures.mjs [--topics] DIR
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { git, commit, rhOk, json, fill, serve, post } from './cli/lib.mjs';
+import { git, commit, rhOk, json, fill, filled, serve, post } from './cli/lib.mjs';
 
 const args = process.argv.slice(2);
 const topics = args[0] === '--topics';
@@ -138,13 +140,7 @@ function note(fields) {
 
 // Fill the items pick(item) gives fields for, from a fresh sheet.
 function fillSheet(file, pick, all = false) {
-    const sheet = json(dir, all ? ['sheet', '--all', file] : ['sheet', file]);
-    const items = [];
-    for (const item of sheet.items) {
-        const fields = pick(item);
-        if (fields) items.push({ ...item, fields: { ...item.fields, ...fields } });
-    }
-    const r = fill(dir, file, { ...sheet, items });
+    const r = fill(dir, file, filled(json(dir, all ? ['sheet', '--all', file] : ['sheet', file]), pick));
     if (r.status !== 0) throw new Error(`fill failed: ${r.stderr}`);
 }
 
@@ -232,10 +228,6 @@ async function historyReview() {
     await asReviewer(file, ANN, url => post(url, 'api/feedback', { iteration: 2, target: 'review', body: 'Please say why the logo is needed at all.' }));
     await asReviewer(file, NOBODY, async url => {
         await post(url, 'api/feedback', { iteration: 2, target: 'commit', commit: rev.c1, body: 'Do not commit binaries.' });
-        await post(url, 'api/feedback', { iteration: 2, target: 'line', commit: rev.c2, path: 'lib/Foo.pm', line: 8, side: 'old', body: 'The old accessor had no default; was anything relying on undef?' });
-        await post(url, 'api/request', { iteration: 2, kind: 'debate', target: 'file', commit: rev.c2, path: 'lib/Foo.pm', note: 'Is greet worth adding?' });
-        await post(url, 'api/request', { iteration: 2, kind: 'split', target: 'file', commit: rev.c2, path: 'js/util.js', note: 'Split shout from join.' });
-        await post(url, 'api/request', { iteration: 2, kind: 'debate', target: 'commit', commit: rev.c3, note: 'Was dropping shout right?' });
     });
 
     // The agent's split of each file, covering every line: subs with their POD,
@@ -285,11 +277,25 @@ async function historyReview() {
         return s ? { sections: withFirstLines(item.about, s) } : null;
     });
 
-    // Section anchors need the split, so this feedback and request come after it.
+    // Section anchors need the split, so the rest of iteration 2's feedback
+    // and requests come after it, in the order a reviewer made them.
     await asReviewer(file, NOBODY, async url => {
         await post(url, 'api/feedback', { iteration: 2, target: 'section', commit: rev.c2, path: 'lib/Foo.pm', section: { name: 'sub greet', package: 'Foo' }, body: 'Could greet take a greeting word?' });
+        await post(url, 'api/feedback', { iteration: 2, target: 'line', commit: rev.c2, path: 'lib/Foo.pm', line: 8, side: 'old', body: 'The old accessor had no default; was anything relying on undef?' });
+        await post(url, 'api/request', { iteration: 2, kind: 'debate', target: 'file', commit: rev.c2, path: 'lib/Foo.pm', note: 'Is greet worth adding?' });
+        await post(url, 'api/request', { iteration: 2, kind: 'split', target: 'file', commit: rev.c2, path: 'js/util.js', note: 'Split shout from join.' });
         await post(url, 'api/request', { iteration: 2, kind: 'debate', target: 'section', commit: rev.c2, path: 'lib/Foo.pm', section: { name: 'sub greet', package: 'Foo' } });
+        await post(url, 'api/request', { iteration: 2, kind: 'debate', target: 'commit', commit: rev.c3, note: 'Was dropping shout right?' });
     });
+
+    // Feedback a re-split moved to its file, keeping the section it was on;
+    // no route anchors file feedback to a section.
+    {
+        const d = db(file);
+        const now = Math.floor(Date.now() / 1000);
+        d.prepare("INSERT INTO feedback (iteration, target, revision, path, section_name, body, created, updated, status) VALUES (2, 'file', ?, 'js/util.js', 'const shout', 'Is the newline in shout intended?', ?, ?, 'open')").run(rev.c2, now, now);
+        d.close();
+    }
 
     const commitText = {
         c1: { what: 'Adds the `Foo` class and two assets.', why: 'Foo is the base of the change.', how: 'A plain blessed hash.' },
@@ -394,9 +400,6 @@ async function historyReview() {
     // Feedback from a tool that records no reviewer.
     d.prepare('UPDATE feedback SET reviewer = NULL WHERE reviewer = ?').run(NOBODY);
     d.prepare('UPDATE request SET reviewer = NULL WHERE reviewer = ?').run(NOBODY);
-
-    // Feedback a re-split moved to its file, keeping the section it was on.
-    d.prepare("INSERT INTO feedback (iteration, target, revision, path, section_name, body, created, updated, status) VALUES (2, 'file', ?, 'js/util.js', 'const shout', 'Is the newline in shout intended?', ?, ?, 'open')").run(rev.c2, now, now);
 
     // A flag on a file its commit did not change, as a squashed iteration
     // carries one when the new squash no longer touches the file; the sheet

@@ -71,8 +71,10 @@ their content:
 It makes a git repository in `DIR` (new or empty), builds and fills the
 review with `bin/review-helper` (so `REVIEW_HELPER_IMPL` picks the backend,
 as for the CLI checks), adds feedback through the HTTP API from short-lived
-servers, writes a few rows no command writes straight into the review file
-with `node:sqlite`, and prints the review file's path. It does not serve
+servers, then edits the review file with `node:sqlite`: a few rows the
+format allows but no command or route writes, and adjustments to some the
+API wrote (reviewer-less feedback, a seen mark). It prints the review file's
+path. It does not serve
 the review: serve it with any backend, then drive the page.
 
     node conformance/fixtures.mjs DIR

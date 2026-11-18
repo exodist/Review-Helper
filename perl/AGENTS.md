@@ -41,9 +41,9 @@ configuration with `GIT_CONFIG_GLOBAL` and create repositories with
   with `node --test`; it skips without `node`.
 - `t/integration/page-e2e.t` drives the page in headless Chrome against a
   real server over a generated review, with `conformance/page-drive.mjs`; it
-  skips without `node` and `google-chrome-stable` or `chromium`, and outside
-  a checkout. It builds each conformance fixture with this backend
-  (`conformance/README.md`, "Fixtures") and serves it with
+  skips without `node` 22.13 or later and `google-chrome-stable` or
+  `chromium`, and outside a checkout. It builds each conformance fixture
+  with this backend (`conformance/README.md`, "Fixtures") and serves it with
   `scripts/review-helper-perl serve`; see that section to run the drive by
   hand (the checks add feedback and close the review). The drive fails itself after `REVIEW_HELPER_E2E_TIMEOUT` seconds
   (default 180); the test notes how long it took. Its whole-page wheel check

@@ -230,7 +230,8 @@ The user manual has the details: `perldoc Review::Helper::Manual`, or
 - `RULINGS.md`: the owner's decisions and why.
 - `PLANNED_TODO.md`: planned work.
 - Tests: `perl/AGENTS.md`, "Testing" (they need git 2.32 or later, node 18
-  or later, and Chrome or Chromium for the page checks);
+  or later, and for the page checks node 22.13 or later and Chrome or
+  Chromium);
   `conformance/README.md` for checking any backend.
 
 ## License

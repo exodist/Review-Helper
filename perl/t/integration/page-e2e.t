@@ -3,6 +3,7 @@ use v5.36;
 use Test2::V0;
 
 use Cwd qw/abs_path/;
+use File::Basename qw/dirname/;
 use File::Spec;
 use File::Temp qw/tempdir/;
 use Time::HiRes qw/time/;
@@ -27,6 +28,7 @@ skip_all "the conformance page drive is not here (run from perl/ in a checkout)"
 
 my $node   = find_bin('node')                            or skip_all "node is not installed";
 my $chrome = find_bin(qw/google-chrome-stable chromium/) or skip_all "neither google-chrome-stable nor chromium is installed";
+skip_all "the fixture builder needs node 22.13 or later (node:sqlite)" if system($node, '--input-type=module', '-e', "await import('node:sqlite')");
 
 my ($pid, $server);
 
@@ -48,11 +50,12 @@ my @inc      = map { abs_path($_) } grep { !ref && -d } @INC;
 sub drive(@mode) {
     my $dir  = tempdir(CLEANUP => 1);
     my $file = do {
-        # The builder runs review-helper, which runs this checkout's backend.
-        local $ENV{PATH}               = join ':' => abs_path('scripts'), $ENV{PATH};
+        # The builder runs review-helper, which runs this checkout's backend
+        # with this perl.
+        local $ENV{PATH}               = join ':' => abs_path('scripts'), dirname($^X), $ENV{PATH};
         local $ENV{PERL5LIB}           = join ':' => @inc;
         local $ENV{REVIEW_HELPER_IMPL} = 'perl';
-        my $out = qx{$node $fixtures @mode $dir/repo};
+        my $out = qx{"$node" "$fixtures" @mode "$dir/repo"};
         is($?, 0, 'the fixture builds') or bail_out("fixture build failed:\n$out");
         (split /\n/ => $out)[-1];
     };

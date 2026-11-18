@@ -212,11 +212,11 @@ sub _file_pathspecs($self, $path, $old_path = undef) {
     return map { ":(literal)$_" } defined($old_path) ? ($old_path, $path) : ($path);
 }
 
-# git 2.36 added --remerge-diff.
+# diff-tree runs --remerge-diff from git 2.47; earlier ones die with a BUG.
 sub _has_remerge_diff($self) {
     return $self->{_has_remerge_diff} //= do {
         my ($major, $minor) = $self->_git('version') =~ m/(\d+)\.(\d+)/;
-        ($major // 0) > 2 || (($major // 0) == 2 && $minor >= 36) ? 1 : 0;
+        ($major // 0) > 2 || (($major // 0) == 2 && $minor >= 47) ? 1 : 0;
     };
 }
 
@@ -390,7 +390,7 @@ the diffs and C<file> return raw bytes.
 
 The format specification gives the git meaning of each of the role's terms.
 C<user> (C<user.name> and C<user.email>) is the one git run that reads the
-user's own configuration; a git older than 2.36 shows no merge resolutions.
+user's own configuration; a git older than 2.47 shows no merge resolutions.
 
 =head1 SYNOPSIS
 

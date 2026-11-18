@@ -2,6 +2,7 @@
 
     - A section's diff no longer splits where only blank lines separate its
       parts: documentation right next to its code shows in one diff with it.
+    - Merge resolutions need git 2.47 or later; older git crashed on them.
 
 0.001     2026-11-12 13:34:14-08:00 America/Los_Angeles
 

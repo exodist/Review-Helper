@@ -117,7 +117,7 @@ Coming soon:
 ## Install
 
 Not released yet; run it from a checkout. You need Perl 5.36 or later, git
-(2.36 or later to see how a merge resolved its conflicts), and a web
+(2.47 or later to see how a merge resolved its conflicts), and a web
 browser.
 
 1. Install [Dist::Zilla](https://metacpan.org/dist/Dist-Zilla)

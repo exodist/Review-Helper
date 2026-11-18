@@ -949,8 +949,8 @@ Agent prose read aloud by the browser's Web Speech API (`speechSynthesis`,
   edits of the human's text and are not limited. There is no delete, and
   the page does not edit requests.
 - Merges with conflict resolutions: a merge's resolutions
-  (`VCS->resolution_changes`; git: `git show --remerge-diff`, git 2.36+, older
-  git reports none) are computed live, once per server per revision
+  (`VCS->resolution_changes`; git: `git diff-tree --remerge-diff`, git 2.47+,
+  older git reports none) are computed live, once per server per revision
   (revisions are immutable), limited to the iteration's path specs. Each
   commit in `/api/review` has `resolution`, true for a merge with any. Nothing is stored in the review file.
 - A section's diff is built by one function from the file after the commit

@@ -67,7 +67,7 @@ hosted setups.
 
 Owner, 2026-11-18: add Go and Node backends, each a full implementation of
 the standard checked by `conformance/` (its fixture builder runs with any
-backend). Go is built (`go/`); Node is next.
+backend).
 
 - **Node** (`review-helper-node`): runs where agent tools already have node,
   via `npx`; SQLite and HTTP built in (`node:sqlite`, node 22.5 or later), so

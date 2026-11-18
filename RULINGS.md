@@ -21,6 +21,34 @@ see `~/projects/Agents/AGENTS.md` under "What earns a place in `RULINGS.md`".
 
 ---
 
+## 2026-11-18 — A repository's own git settings reach its diffs
+
+**Ruling (owner): git calls ignore global and system config, but a
+repository's own `.git/config` still applies. A setting is pinned with a
+flag on the call that needs it only when it breaks Review-Helper's
+output.** Rules out overriding repository config centrally for every git
+call.
+
+Evidence: of the diff settings tried, only `log.showSignature` broke
+anything (fixed with `--no-show-signature`). `diff.suppressBlankEmpty` is
+already handled by the parser, `core.quotePath` changes only header lines
+the parser skips, and `diff.relative` and `diff.orderFile` have no
+visible effect. The rest give people the diffs they configured.
+
+## 2026-11-18 — No NJH smoker guard; native Windows perl is unsupported
+
+**Ruling (owner): `Makefile.PL` stops only on a perl that cannot fork
+(native Windows perl), so those testers report NA; Cygwin's perl stays
+supported. It carries no NJH smoker guard, although the shared packaging
+audit expects one beside a configure-time header.** Rules out adding the
+guard as an audit fix.
+
+Evidence: the git runner forks, and the 0.001 reports from native Windows
+all failed. The NJH smokers' broken results date from years ago and may be
+fixed. Revisit native Windows if users ask for it (the work: a git runner
+without fork, path handling, the `sh` dispatcher); add the NJH guard back if
+those smokers send broken reports again.
+
 ## 2026-11-12 — `AI_DOCS` holds only documents for upcoming development
 
 **Ruling (owner): `AI_DOCS/` keeps only working documents an agent needs for

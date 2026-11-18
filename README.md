@@ -116,9 +116,20 @@ Coming soon:
 
 ## Install
 
-Not released yet; run it from a checkout. You need Perl 5.36 or later, git
-(2.36 or later to see how a merge resolved its conflicts), and a web
-browser.
+You need Perl 5.36 or later, git (2.36 or later to see how a merge resolved
+its conflicts), and a web browser. It needs a perl that can fork: Cygwin's
+perl works on Windows, native Windows perl does not.
+
+From CPAN: `cpanm Review::Helper` installs `review-helper` and the Perl
+backend. Then link the nine skills into your agent's skills directory
+(`~/.claude/skills/` for Claude Code, `~/.agents/skills/` for Codex), one
+line each, or ask your agent to do it:
+
+```
+ln -s "$(review-helper skills path)/review-build" ~/.claude/skills/
+```
+
+From a checkout:
 
 1. Install [Dist::Zilla](https://metacpan.org/dist/Dist-Zilla)
    (`cpanm Dist::Zilla`), then the Perl dependencies:
@@ -139,12 +150,10 @@ browser.
    ```
 
    `review-helper --which` should now name the Perl backend.
-3. Link the nine skills into your agent's skills directory, one line each:
-   `ln -s "$(review-helper skills path)/review-build" ~/.claude/skills/`
-   (Claude Code) or `~/.agents/skills/` (Codex). Or ask your agent to do it.
+3. Link the skills as above.
 
-The user manual has the details: `perldoc perl/lib/Review/Helper/Manual.pm`
-from the checkout.
+The user manual has the details: `perldoc Review::Helper::Manual`, or
+`perldoc perl/lib/Review/Helper/Manual.pm` from a checkout.
 
 ## Repository layout
 

@@ -18,4 +18,6 @@ tests and these notes). Read the top-level `AGENTS.md` first.
 - highlight.js is vendored, minified, with its license, in `js/highlight/`.
 - Pure functions live in `js/logic.js` and are unit tested in
   `t/logic.test.mjs`: `node --test ux/t/` from the top of the repository.
+  `package.json` only tells node that `js/` holds ES modules; older node
+  reads them as CommonJS without it.
   Interactions are checked by `conformance/page-drive.mjs`.

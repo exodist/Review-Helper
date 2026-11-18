@@ -121,10 +121,13 @@ its conflicts), and a web browser. It needs a perl that can fork: Cygwin's
 perl works on Windows, native Windows perl does not.
 
 From CPAN: `cpanm Review::Helper` installs `review-helper` and the Perl
-backend. Then link the nine skills into your agent's skills directory, one
-line each: `ln -s "$(review-helper skills path)/review-build"
-~/.claude/skills/` (Claude Code) or `~/.agents/skills/` (Codex). Or ask your
-agent to do it.
+backend. Then link the nine skills into your agent's skills directory
+(`~/.claude/skills/` for Claude Code, `~/.agents/skills/` for Codex), one
+line each, or ask your agent to do it:
+
+```
+ln -s "$(review-helper skills path)/review-build" ~/.claude/skills/
+```
 
 From a checkout:
 

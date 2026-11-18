@@ -23,10 +23,7 @@ func (c *sheetContext) fileTexts(e *sheetCommit, f *sheetFile) (*fileTexts, erro
 		return t, nil
 	}
 	t := &fileTexts{}
-	parent := ""
-	if e.Parent != nil {
-		parent = *e.Parent
-	}
+	parent := deref(e.Parent)
 	if parent != "" && f.Status != "A" {
 		oldPath := f.Path
 		if f.OldPath != nil {
@@ -45,21 +42,7 @@ func (c *sheetContext) fileTexts(e *sheetCommit, f *sheetFile) (*fileTexts, erro
 		}
 		t.after = SplitLines(decodeText(b))
 	}
-	if parent == "" {
-		var err error
-		if parent, err = c.repo.EmptyRevision(); err != nil {
-			return nil, err
-		}
-	}
-	oldPath := ""
-	if f.OldPath != nil {
-		oldPath = *f.OldPath
-	}
-	raw, err := c.repo.RangeDiff(parent, e.Revision, f.Path, oldPath)
-	if err != nil {
-		return nil, err
-	}
-	d, err := ParseDiff(decodeText(raw))
+	d, err := commitDiff(c.repo, parent, e.Revision, f.Path, deref(f.OldPath))
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +81,7 @@ func (v *validator) checkSplit(it *sheetItem, fields map[string]json.RawMessage)
 	for n, raw := range entries {
 		u, errs := checkUnit(it.file, t, raw, claims, n+1)
 		if len(errs) == 0 {
-			key := [2]string{orBlank(u.Package), u.Name}
+			key := [2]string{deref(u.Package), u.Name}
 			if names[key] {
 				in := ""
 				if u.Package != nil {
@@ -129,15 +112,7 @@ func (v *validator) checkSplit(it *sheetItem, fields map[string]json.RawMessage)
 	return v.writeSplit(it, sections), nil
 }
 
-// orBlank is the string, or "" for none.
-func orBlank(p *string) string {
-	if p == nil {
-		return ""
-	}
-	return *p
-}
-
-var unitFields = map[string]bool{"name": true, "package": true, "lines": true, "first_line": true, "doc_lines": true, "old_lines": true, "old_first_line": true}
+var unitFields = []string{"name", "package", "lines", "first_line", "doc_lines", "old_lines", "old_first_line"}
 
 // checkUnit checks one section of a split: a name, ranges inside the file
 // that no other section holds, and the text of its first line on each side
@@ -161,16 +136,7 @@ func checkUnit(f *sheetFile, t *fileTexts, raw json.RawMessage, claims splitClai
 		}
 		u.Package = &pkg
 	}
-	var unknown []string
-	for k := range obj {
-		if !unitFields[k] {
-			unknown = append(unknown, k)
-		}
-	}
-	sort.Strings(unknown)
-	for _, k := range unknown {
-		problems = append(problems, fmt.Sprintf("unknown field '%s'", k))
-	}
+	problems = append(problems, unknownFields(obj, "", unitFields...)...)
 
 	lists := map[string][]json.RawMessage{}
 	var shape []string
@@ -377,7 +343,7 @@ func moveSectionFeedback(tx *sql.Tx, revision, path string, sections []*Section)
 	kept := map[[2]string]bool{}
 	for _, s := range sections {
 		if s.Touched() {
-			kept[[2]string{s.Name, orBlank(s.Package)}] = true
+			kept[[2]string{s.Name, deref(s.Package)}] = true
 		}
 	}
 	for _, table := range []string{"feedback", "request"} {
@@ -393,7 +359,7 @@ func moveSectionFeedback(tx *sql.Tx, revision, path string, sections []*Section)
 				rows.Close()
 				return err
 			}
-			if !kept[[2]string{orBlank(name), orBlank(pkg)}] {
+			if !kept[[2]string{deref(name), deref(pkg)}] {
 				move = append(move, id)
 			}
 		}

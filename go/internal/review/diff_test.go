@@ -49,13 +49,13 @@ func TestAttributeAndOwners(t *testing.T) {
 	b := &Span{Ranges: [][2]int{{4, 12}}}
 	gone := &Span{OldRanges: [][2]int{{10, 11}}, Deleted: true}
 	Attribute(d.Hunks, []*Span{a, b, gone})
-	if a.Counts != (Counts{Added: 1, Changed: 1}) || !a.Touched {
+	if a.Counts != (Counts{Added: 1, Changed: 1}) {
 		t.Fatalf("a %+v", a)
 	}
-	if b.Touched || b.Counts != (Counts{}) {
+	if b.Counts != (Counts{}) {
 		t.Fatalf("b %+v", b)
 	}
-	if gone.Counts != (Counts{Removed: 2}) || !gone.Touched {
+	if gone.Counts != (Counts{Removed: 2}) {
 		t.Fatalf("gone %+v", gone)
 	}
 }

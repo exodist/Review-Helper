@@ -4,9 +4,11 @@ A single binary, `review-helper-go`, with the review page, the agent skills
 and the standards built in. Shared steps (the `review-helper` command,
 linking the skills) are in the root [`INSTALL.md`](../INSTALL.md).
 
-It runs on Linux, macOS and the BSDs, and on Windows under Cygwin, WSL or
-Git Bash, where the `review-helper` command (a POSIX `sh` script) runs.
-Native Windows, without a POSIX shell, is not supported yet.
+It runs on Linux, macOS and the BSDs, and on Windows through WSL (where it
+is a Linux program). Windows itself is not supported yet: the binary does
+not build there (its file locking uses `flock`), Go has no Cygwin target,
+so under Cygwin or Git Bash it would be a Windows program too, and the
+`review-helper` command would not run one named `review-helper-go.exe`.
 
 ## From a checkout
 

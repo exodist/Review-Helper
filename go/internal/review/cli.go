@@ -10,9 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -22,41 +20,33 @@ import (
 
 // The command line (standards/CLI.md).
 
-// A command parses its own options and runs, writing what it prints to out
-// and its warnings to warn.
-type command func(args []string, out, warn io.Writer) error
+// A command parses its own options and runs, reading standard input from
+// in, writing what it prints to out and its warnings to warn.
+type command func(args []string, in io.Reader, out, warn io.Writer) error
 
-// commands is filled in init: it refers to functions that refer back to it
-// (usage), so it cannot be initialized in its declaration.
-var commands map[string]command
-
-func init() {
-	commands = map[string]command{
-		"build":     runBuild,
-		"close":     runClose,
-		"export":    runExport,
-		"feedback":  runFeedback,
-		"fill":      runFill,
-		"import":    runImport,
-		"iterate":   runIterate,
-		"list":      runList,
-		"note":      runNote,
-		"prune":     runPrune,
-		"published": runPublished,
-		"serve":     runServe,
-		"sheet":     runSheet,
-		"skills":    runSkills,
-		"version":   runVersion,
-	}
+var commands = map[string]command{
+	"build":     runBuild,
+	"close":     runClose,
+	"export":    runExport,
+	"feedback":  runFeedback,
+	"fill":      runFill,
+	"import":    runImport,
+	"iterate":   runIterate,
+	"list":      runList,
+	"note":      runNote,
+	"prune":     runPrune,
+	"published": runPublished,
+	"serve":     runServe,
+	"sheet":     runSheet,
+	"skills":    runSkills,
+	"version":   runVersion,
 }
 
-// streaming commands print as they run instead of when they succeed.
-var streaming = map[string]bool{"serve": true}
-
-// Run runs a command line and returns the exit status. A command's output
-// is held until it succeeds, so one that fails prints nothing on standard
-// output.
-func Run(args []string, stdout, stderr io.Writer) int {
+// Run runs a command line and returns the exit status. A first argument
+// that names no command is a review file to serve. A command's output is
+// held until it succeeds, so one that fails prints nothing on standard
+// output; serve, which runs until stopped, prints as it goes.
+func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprint(stderr, usage())
 		return 1
@@ -66,30 +56,29 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if ok {
 		args = args[1:]
 	} else {
-		// Anything that is not a command is a review file to serve.
-		name, run = "serve", commands["serve"]
+		name, run = "serve", runServe
 	}
-	if run == nil {
-		fmt.Fprintf(stderr, "review-helper: unknown command %q\n%s", name, usage())
-		return 1
+	out := stdout
+	var held bytes.Buffer
+	if name != "serve" {
+		out = &held
 	}
-	// A command that runs until stopped, as serve does, prints as it goes.
-	if streaming[name] {
-		if err := run(args, stdout, stderr); err != nil {
-			fmt.Fprintf(stderr, "review-helper %s: %s\n", name, strings.TrimSuffix(err.Error(), "\n"))
-			return 1
-		}
-		return 0
-	}
-	var out bytes.Buffer
-	if err := run(args, &out, stderr); err != nil {
+	if err := run(args, stdin, out, stderr); err != nil {
 		fmt.Fprintf(stderr, "review-helper %s: %s\n", name, strings.TrimSuffix(err.Error(), "\n"))
 		return 1
 	}
-	if _, err := stdout.Write(out.Bytes()); err != nil {
+	if _, err := stdout.Write(held.Bytes()); err != nil {
 		return 1
 	}
 	return 0
+}
+
+// readInput reads the named file, or in when the name is "-".
+func readInput(name string, in io.Reader) ([]byte, error) {
+	if name == "-" {
+		return io.ReadAll(in)
+	}
+	return os.ReadFile(name)
 }
 
 func usage() string {
@@ -186,7 +175,7 @@ func journalOf(repo *git.Repo, warn io.Writer) (*Journal, error) {
 	return &Journal{Path: filepath.Join(dir, "journal.jsonl"), Warn: warn}, nil
 }
 
-func runNote(args []string, out, warn io.Writer) error {
+func runNote(args []string, in io.Reader, out, warn io.Writer) error {
 	var flag, kind, path, unit, snippet, sentence, detail string
 	o := newOptions()
 	for name, p := range map[string]*string{"flag": &flag, "kind": &kind, "path": &path, "unit": &unit, "snippet": &snippet, "sentence": &sentence, "detail": &detail} {
@@ -220,7 +209,7 @@ func runNote(args []string, out, warn io.Writer) error {
 	return nil
 }
 
-func runList(args []string, out, warn io.Writer) error {
+func runList(args []string, in io.Reader, out, warn io.Writer) error {
 	if len(args) > 0 {
 		return errors.New("usage: review-helper list")
 	}
@@ -243,7 +232,7 @@ func runList(args []string, out, warn io.Writer) error {
 	return nil
 }
 
-func runPrune(args []string, out, warn io.Writer) error {
+func runPrune(args []string, in io.Reader, out, warn io.Writer) error {
 	var dryRun bool
 	o := newOptions()
 	o.flag("dry-run", &dryRun)
@@ -268,7 +257,7 @@ func runPrune(args []string, out, warn io.Writer) error {
 	return nil
 }
 
-func runClose(args []string, out, warn io.Writer) error {
+func runClose(args []string, in io.Reader, out, warn io.Writer) error {
 	if len(args) != 1 {
 		return errors.New("usage: review-helper close FILE")
 	}
@@ -284,18 +273,13 @@ func runClose(args []string, out, warn io.Writer) error {
 	return NewRegistry(repo).Close(d, args[0])
 }
 
-var positiveInt = regexp.MustCompile(`^[1-9][0-9]*$`)
-
-func runPublished(args []string, out, warn io.Writer) error {
+func runPublished(args []string, in io.Reader, out, warn io.Writer) error {
 	if len(args) != 2 {
 		return errors.New("usage: review-helper published FILE ID")
 	}
-	if !positiveInt.MatchString(args[1]) {
+	id, ok := parsePositive(args[1])
+	if !ok {
 		return fmt.Errorf("feedback ID must be a positive integer, got %q", args[1])
-	}
-	id, err := strconv.ParseInt(args[1], 10, 64)
-	if err != nil {
-		return err
 	}
 	d, err := OpenDB(args[0])
 	if err != nil {
@@ -305,7 +289,7 @@ func runPublished(args []string, out, warn io.Writer) error {
 	return d.SetPublished(id)
 }
 
-func runSkills(args []string, out, warn io.Writer) error {
+func runSkills(args []string, in io.Reader, out, warn io.Writer) error {
 	if len(args) != 1 || args[0] != "path" {
 		return errors.New("usage: review-helper skills path")
 	}
@@ -317,7 +301,7 @@ func runSkills(args []string, out, warn io.Writer) error {
 	return nil
 }
 
-func runVersion(args []string, out, warn io.Writer) error {
+func runVersion(args []string, in io.Reader, out, warn io.Writer) error {
 	if len(args) > 0 {
 		return errors.New("usage: review-helper version")
 	}
@@ -327,6 +311,8 @@ func runVersion(args []string, out, warn io.Writer) error {
 
 // SkillsDir writes the embedded skills, once, to a cache directory named by
 // their content and returns it: agents link skill directories from disk.
+// The copy is written beside the cache directory and renamed into place,
+// so a run never sees another's half-written copy.
 func SkillsDir() (string, error) {
 	skills, err := fs.Sub(share.FS, "skills")
 	if err != nil {
@@ -356,18 +342,27 @@ func SkillsDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	root := filepath.Join(cache, "review-helper-go", Version+"-"+hex.EncodeToString(h.Sum(nil))[:16])
+	parent := filepath.Join(cache, "review-helper-go")
+	root := filepath.Join(parent, Version+"-"+hex.EncodeToString(h.Sum(nil))[:16])
 	dir := filepath.Join(root, "skills")
 	done := filepath.Join(root, "complete")
 	if _, err := os.Stat(done); err == nil {
 		return dir, nil
 	}
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return "", err
+	}
+	tmp, err := os.MkdirTemp(parent, ".skills-")
+	if err != nil {
+		return "", err
+	}
+	defer os.RemoveAll(tmp)
 	for _, p := range files {
 		b, err := fs.ReadFile(skills, p)
 		if err != nil {
 			return "", err
 		}
-		dest := filepath.Join(dir, filepath.FromSlash(p))
+		dest := filepath.Join(tmp, "skills", filepath.FromSlash(p))
 		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 			return "", err
 		}
@@ -375,5 +370,27 @@ func SkillsDir() (string, error) {
 			return "", err
 		}
 	}
-	return dir, os.WriteFile(done, nil, 0o644)
+	if err := os.WriteFile(filepath.Join(tmp, "complete"), nil, 0o644); err != nil {
+		return "", err
+	}
+	// MkdirTemp makes the directory 0700; the copy is for agents to read.
+	if err := os.Chmod(tmp, 0o755); err != nil {
+		return "", err
+	}
+	err = os.Rename(tmp, root)
+	if err != nil {
+		if _, statErr := os.Stat(done); statErr == nil {
+			return dir, nil // another run put its copy in place first
+		}
+		// A copy left half-written by an older version, before copies
+		// were renamed into place.
+		if rmErr := os.RemoveAll(root); rmErr != nil {
+			return "", rmErr
+		}
+		err = os.Rename(tmp, root)
+	}
+	if err != nil {
+		return "", err
+	}
+	return dir, nil
 }

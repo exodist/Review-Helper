@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -23,12 +24,6 @@ import (
 )
 
 const serveUsage = "usage: review-helper serve FILE [--port N | --port-command CMD] [--listen ADDR] [--allow-host NAME]... [--open] [--reviewer NAME]"
-
-// runServe prints the page's URL as soon as the server listens, and runs
-// until stopped; Run gives it standard output itself (streaming).
-func runServe(args []string, out, warn io.Writer) error {
-	return serve(args, out, warn)
-}
 
 // serveOptions are serve's settings, from options and the environment.
 type serveOptions struct {
@@ -88,7 +83,9 @@ func parseServe(args []string) (*serveOptions, error) {
 	return &so, nil
 }
 
-func serve(args []string, stdout, stderr io.Writer) error {
+// runServe serves a review file until stopped. It prints the page's URL as
+// soon as the server listens, so Run hands it standard output directly.
+func runServe(args []string, in io.Reader, stdout, stderr io.Writer) error {
 	so, err := parseServe(args)
 	if err != nil {
 		return err
@@ -111,7 +108,13 @@ func serve(args []string, stdout, stderr io.Writer) error {
 	}
 	defer d.Close()
 
-	ln, err := net.Listen("tcp", net.JoinHostPort(so.listen, strconv.Itoa(port)))
+	// An IPv4 address listens on IPv4 alone: Go would bind 0.0.0.0 to every
+	// IPv6 address too, more than was asked for.
+	network := "tcp"
+	if ip, err := netip.ParseAddr(so.listen); err == nil && ip.Is4() {
+		network = "tcp4"
+	}
+	ln, err := net.Listen(network, net.JoinHostPort(so.listen, strconv.Itoa(port)))
 	if err != nil {
 		return fmt.Errorf("cannot listen on %s port %d: %w", so.listen, port, err)
 	}
@@ -119,13 +122,14 @@ func serve(args []string, stdout, stderr io.Writer) error {
 	bound := ln.Addr().(*net.TCPAddr)
 	local := bound.IP.IsLoopback()
 
-	var token string
+	var token, fullName string
 	hosts := so.allowHosts
 	if !local {
 		if token, err = NewToken(); err != nil {
 			return err
 		}
-		hosts = append(hosts, networkNames(so.listen, bound.IP)...)
+		fullName = fqdn()
+		hosts = append(hosts, networkNames(so.listen, bound.IP, fullName)...)
 	}
 	access := NewAccess(reviewerFor(so.reviewer, repo), token, bound.Port, hosts)
 	srv := &http.Server{
@@ -133,7 +137,7 @@ func serve(args []string, stdout, stderr io.Writer) error {
 		ReadHeaderTimeout: 30 * time.Second,
 	}
 
-	urls := serveURLs(so.listen, bound)
+	urls := serveURLs(so.listen, bound, fullName)
 	if token != "" {
 		urls[0] += "?token=" + token // beyond loopback, the first URL is for other machines
 	}
@@ -168,11 +172,11 @@ func (so *serveOptions) pickPort(stderr io.Writer) (int, error) {
 		if so.port == "" {
 			return 0, nil
 		}
-		n, err := strconv.Atoi(so.port)
-		if !allDigits(so.port) || err != nil || n > 65535 {
+		n, ok := parseDigits(so.port)
+		if !ok || n > 65535 {
 			return 0, fmt.Errorf("invalid port '%s'", so.port)
 		}
-		return n, nil
+		return int(n), nil
 	}
 	return runPortCommand(so.portCommand, stderr)
 }
@@ -192,11 +196,11 @@ func runPortCommand(command string, stderr io.Writer) (int, error) {
 		return 0, fmt.Errorf("cannot run port command '%s': %w", command, err)
 	}
 	s := strings.TrimSpace(string(out))
-	n, err := strconv.Atoi(s)
-	if !allDigits(s) || err != nil || n < 1 || n > 65535 {
+	n, ok := parseDigits(s)
+	if !ok || n < 1 || n > 65535 {
 		return 0, fmt.Errorf("port command '%s' printed '%s', not a port number", command, s)
 	}
-	return n, nil
+	return int(n), nil
 }
 
 // reviewerFor is the server's reviewer: as given, else
@@ -212,8 +216,9 @@ func reviewerFor(given string, repo *git.Repo) string {
 }
 
 // serveURLs are the URLs to print: the one to open from another machine,
-// then the loopback one when the socket answers on loopback too.
-func serveURLs(listen string, bound *net.TCPAddr) []string {
+// then the loopback one when the socket answers on loopback too. fullName
+// is this machine's fqdn, for a wildcard address.
+func serveURLs(listen string, bound *net.TCPAddr, fullName string) []string {
 	url := func(host string) string {
 		return "http://" + net.JoinHostPort(host, strconv.Itoa(bound.Port)) + "/"
 	}
@@ -224,9 +229,9 @@ func serveURLs(listen string, bound *net.TCPAddr) []string {
 		return []string{url(listen)}
 	// Go binds a wildcard dual-stack, so the address given says which.
 	case net.ParseIP(listen).To4() == nil:
-		return []string{url(fqdn()), url("::1")}
+		return []string{url(fullName), url("::1")}
 	default:
-		return []string{url(fqdn()), url("127.0.0.1")}
+		return []string{url(fullName), url("127.0.0.1")}
 	}
 }
 
@@ -246,15 +251,15 @@ func fqdn() string {
 
 // networkNames are the names a browser elsewhere may put in the Host
 // header: the address given and the one bound (unless a wildcard), this
-// machine's host name and FQDN and the addresses they resolve to, and the
-// addresses outgoing traffic leaves from. Other interfaces' addresses need
-// --allow-host.
-func networkNames(listen string, bound net.IP) []string {
+// machine's host name and fullName, its FQDN, and the addresses they
+// resolve to, and the addresses outgoing traffic leaves from. Other
+// interfaces' addresses need --allow-host.
+func networkNames(listen string, bound net.IP, fullName string) []string {
 	var names []string
 	if host, err := os.Hostname(); err == nil {
 		names = append(names, host)
 	}
-	names = append(names, fqdn())
+	names = append(names, fullName)
 	hosts := append([]string{}, names...)
 	for _, h := range []string{listen, bound.String()} {
 		if ip := net.ParseIP(h); ip == nil || !ip.IsUnspecified() {

@@ -74,9 +74,9 @@ backend). Go is built (`go/`); Node is next.
   it can ship with no dependencies, and can share code with the page.
 
 A Python backend once someone wants one. A `.cmd` dispatcher if native
-Windows users appear: the Go binary runs there, but `review-helper` is a
-POSIX `sh` script, so for now Go supports Windows only under Cygwin, WSL or
-Git Bash.
+Windows users appear, with, for the Go backend, a Windows file lock in
+place of `flock` and `.exe` names accepted: until then Go supports Windows
+only through WSL.
 
 ## Extension points in the review file format
 

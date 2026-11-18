@@ -24,7 +24,7 @@ var DiffOptions = []string{
 	"--src-prefix=a/", "--dst-prefix=b/",
 }
 
-var statusMap = map[byte]string{'A': "A", 'D': "D", 'M': "M", 'R': "R", 'T': "M", 'C': "A"}
+var statusMap = map[byte]string{'A': "A", 'D': "D", 'M': "M", 'R': "R", 'T': "M"}
 
 // Repo is a worktree of a git repository.
 type Repo struct {
@@ -32,9 +32,10 @@ type Repo struct {
 	GitDir    string
 	CommonDir string
 
-	emptyOnce sync.Once
-	empty     string
-	remerge   *bool
+	// What git is asked once per repository, safe to share between
+	// goroutines.
+	emptyTree   func() (string, error)
+	remergeDiff func() (bool, error)
 }
 
 // Change is one file that differs between two revisions.
@@ -42,8 +43,6 @@ type Change struct {
 	Path      string
 	OldPath   string // renames only
 	Status    string // A, D, M or R
-	Added     int
-	Removed   int
 	Binary    bool
 	Submodule bool // either side is another repository's entry
 }
@@ -105,7 +104,7 @@ func Find(path string) (*Repo, error) {
 		}
 		root = strings.SplitN(top, "\n", 2)[0]
 	}
-	return &Repo{Root: root, GitDir: gitDir, CommonDir: commonDir}, nil
+	return newRepo(root, gitDir, commonDir), nil
 }
 
 // StateDir is the backend's directory for this worktree.
@@ -147,14 +146,17 @@ func (r *Repo) Resolve(name string) (string, error) {
 }
 
 // EmptyRevision is the empty tree's id.
-func (r *Repo) EmptyRevision() (string, error) {
-	var err error
-	r.emptyOnce.Do(func() {
-		var out string
-		out, err = r.git("hash-object", "-t", "tree", "/dev/null")
-		r.empty = strings.TrimRight(out, "\n")
+func (r *Repo) EmptyRevision() (string, error) { return r.emptyTree() }
+
+// newRepo makes a Repo, its once-asked answers ready.
+func newRepo(root, gitDir, commonDir string) *Repo {
+	r := &Repo{Root: root, GitDir: gitDir, CommonDir: commonDir}
+	r.emptyTree = sync.OnceValues(func() (string, error) {
+		out, err := r.git("hash-object", "-t", "tree", "/dev/null")
+		return strings.TrimRight(out, "\n"), err
 	})
-	return r.empty, err
+	r.remergeDiff = sync.OnceValues(r.probeRemergeDiff)
+	return r
 }
 
 // HasRevision reports whether the commit is in the repository.
@@ -231,20 +233,26 @@ func (r *Repo) Parents(sha string) ([]string, error) {
 	return f[1:], nil
 }
 
-func (r *Repo) parentOrEmpty(sha string) (string, error) {
-	p, err := r.Parents(sha)
-	if err != nil {
-		return "", err
-	}
-	if len(p) > 0 {
-		return p[0], nil
+// ParentOrEmpty is the revision to diff a commit against: its parent, or
+// the empty tree for a root commit (parent "").
+func (r *Repo) ParentOrEmpty(parent string) (string, error) {
+	if parent != "" {
+		return parent, nil
 	}
 	return r.EmptyRevision()
 }
 
 // ChangeID is a stable id of the commit's change, "" when it changes nothing.
 func (r *Repo) ChangeID(sha string) (string, error) {
-	parent, err := r.parentOrEmpty(sha)
+	parents, err := r.Parents(sha)
+	if err != nil {
+		return "", err
+	}
+	first := ""
+	if len(parents) > 0 {
+		first = parents[0]
+	}
+	parent, err := r.ParentOrEmpty(first)
 	if err != nil {
 		return "", err
 	}
@@ -281,13 +289,13 @@ func (r *Repo) RangeChanges(from, to string, paths []string) ([]*Change, error) 
 	if err != nil {
 		return nil, err
 	}
-	counts := parseNumstat(numstat)
+	binary := parseNumstat(numstat)
 	for _, c := range changes {
-		n, ok := counts[c.Path]
+		b, ok := binary[c.Path]
 		if !ok {
 			return nil, fmt.Errorf("no line counts for '%s'", c.Path)
 		}
-		c.Added, c.Removed, c.Binary = n.Added, n.Removed, n.Binary
+		c.Binary = b
 	}
 	return changes, nil
 }
@@ -449,10 +457,9 @@ var versionRE = regexp.MustCompile(`(\d+)\.(\d+)`)
 
 // git 2.36 added --remerge-diff; show, not diff-tree, which dies with a BUG
 // on it before 2.47.
-func (r *Repo) hasRemergeDiff() (bool, error) {
-	if r.remerge != nil {
-		return *r.remerge, nil
-	}
+func (r *Repo) hasRemergeDiff() (bool, error) { return r.remergeDiff() }
+
+func (r *Repo) probeRemergeDiff() (bool, error) {
 	out, err := r.git("version")
 	if err != nil {
 		return false, err
@@ -463,7 +470,6 @@ func (r *Repo) hasRemergeDiff() (bool, error) {
 		minor, _ := strconv.Atoi(m[2])
 		ok = major > 2 || (major == 2 && minor >= 36)
 	}
-	r.remerge = &ok
 	return ok, nil
 }
 
@@ -510,7 +516,7 @@ func rootFromGitDir(gitDir, commonDir string) (string, error) {
 		} else {
 			data, err := os.ReadFile(filepath.Join(gitDir, "gitdir"))
 			if err != nil {
-				return "", fmt.Errorf("cannot find the worktree of %s: %v", gitDir, err)
+				return "", fmt.Errorf("cannot find the worktree of %s: %w", gitDir, err)
 			}
 			dotGit := strings.SplitN(string(data), "\n", 2)[0]
 			// Relative when the worktree was added with --relative-paths.
@@ -561,7 +567,7 @@ func parseRaw(raw []byte) ([]*Change, error) {
 			return nil, fmt.Errorf("unexpected diff status '%c'", code)
 		}
 		c := &Change{Status: status, Submodule: f[0] == "160000" || f[1] == "160000"}
-		if code == 'R' || code == 'C' {
+		if code == 'R' {
 			c.OldPath = tokens[i]
 			i++
 		}
@@ -570,21 +576,15 @@ func parseRaw(raw []byte) ([]*Change, error) {
 		}
 		c.Path = tokens[i]
 		i++
-		if c.Status != "R" {
-			c.OldPath = ""
-		}
 		changes = append(changes, c)
 	}
 	return changes, nil
 }
 
-type count struct {
-	Added, Removed int
-	Binary         bool
-}
-
-func parseNumstat(numstat []byte) map[string]count {
-	counts := map[string]count{}
+// parseNumstat reads --numstat -z output: whether each path is binary
+// (counted "-").
+func parseNumstat(numstat []byte) map[string]bool {
+	binary := map[string]bool{}
 	tokens := strings.Split(string(numstat), "\x00")
 	for i := 0; i < len(tokens); {
 		t := tokens[i]
@@ -604,16 +604,9 @@ func parseNumstat(numstat []byte) map[string]count {
 			}
 			i++
 		}
-		var n count
-		if f[0] == "-" {
-			n.Binary = true
-		} else {
-			n.Added, _ = strconv.Atoi(f[0])
-			n.Removed, _ = strconv.Atoi(f[1])
-		}
-		counts[path] = n
+		binary[path] = f[0] == "-"
 	}
-	return counts
+	return binary
 }
 
 func (r *Repo) predicate(args ...string) (bool, error) {
@@ -658,7 +651,7 @@ func run(dir string, input []byte, args ...string) ([]byte, int, string, error) 
 	if err != nil {
 		var ee *exec.ExitError
 		if !errors.As(err, &ee) {
-			return nil, 0, "", fmt.Errorf("exec git failed: %v", err)
+			return nil, 0, "", fmt.Errorf("exec git failed: %w", err)
 		}
 		code = ee.ExitCode()
 		if code < 0 {

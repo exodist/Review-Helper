@@ -18,7 +18,8 @@ Skills and people run `review-helper`, a short POSIX `sh` script
 (`review-helper-perl`, `review-helper-go`, ...). Every backend installs it.
 With several installed, the first on `PATH` runs, or the one
 `REVIEW_HELPER_IMPL` names; `review-helper --which` lists them. It needs a
-POSIX shell: on Windows, Cygwin, WSL or Git Bash.
+POSIX shell: on Windows, Cygwin, WSL or Git Bash for the Perl backend, WSL
+for the Go one (`go/INSTALL.md`).
 
 ## The agent skills
 

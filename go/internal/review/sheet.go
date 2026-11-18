@@ -215,15 +215,11 @@ type (
 
 	// Anchor is where feedback or a request was given.
 	Anchor struct {
-		Target  string       `json:"target"`
-		Commit  *string      `json:"commit"`
-		Topic   *string      `json:"topic"`
-		Path    *string      `json:"path"`
-		Section *SectionName `json:"section"`
-	}
-	SectionName struct {
-		Name    string  `json:"name"`
-		Package *string `json:"package"`
+		Target  string      `json:"target"`
+		Commit  *string     `json:"commit"`
+		Topic   *string     `json:"topic"`
+		Path    *string     `json:"path"`
+		Section *SectionRef `json:"section"`
 	}
 	FeedbackAbout struct {
 		Anchor
@@ -304,7 +300,10 @@ type sheetFile struct {
 	sections []*Section
 }
 
-func loadSheetContext(d *DB, repo *git.Repo, j *Journal) (*sheetContext, error) {
+// loadSheetContext reads what the latest iteration's items are built from.
+// warn, when set, gets a line for each flagged note of the journal skipped
+// as one the journal could not have written.
+func loadSheetContext(d *DB, repo *git.Repo, j *Journal, warn io.Writer) (*sheetContext, error) {
 	it, err := d.LatestIteration()
 	if err != nil {
 		return nil, err
@@ -358,10 +357,17 @@ func loadSheetContext(d *DB, repo *git.Repo, j *Journal) (*sheetContext, error) 
 		return nil, err
 	}
 	for _, n := range notes {
-		// Only a note the journal could have written can become a flag.
-		if n.Flag.Set && n.Problem() == "" {
-			c.notes = append(c.notes, n)
+		if !n.Flag.Set {
+			continue
 		}
+		// Only a note the journal could have written can become a flag.
+		if err := n.Problem(); err != nil {
+			if warn != nil {
+				fmt.Fprintf(warn, "skipping flagged journal note %s: %s\n", n.ID.Value, err)
+			}
+			continue
+		}
+		c.notes = append(c.notes, n)
 	}
 	return c, nil
 }
@@ -529,7 +535,7 @@ func orderItem(e *sheetCommit, squashed bool) *sheetItem {
 	var fields OrderFields
 	if e.OrderSet {
 		files := slices.Clone(e.files)
-		sort.SliceStable(files, func(a, b int) bool { return orZero(files[a].ReadPosition) < orZero(files[b].ReadPosition) })
+		sort.SliceStable(files, func(a, b int) bool { return deref(files[a].ReadPosition) < deref(files[b].ReadPosition) })
 		for _, f := range files {
 			fields.Paths = append(fields.Paths, f.Path)
 		}
@@ -539,14 +545,6 @@ func orderItem(e *sheetCommit, squashed bool) *sheetItem {
 		done:      e.OrderSet,
 		commit:    e,
 	}
-}
-
-// orZero is the number, or 0 for none.
-func orZero(p *int64) int64 {
-	if p == nil {
-		return 0
-	}
-	return *p
 }
 
 func fileItem(e *sheetCommit, f *sheetFile) *sheetItem {
@@ -753,11 +751,7 @@ func (c *sheetContext) rewritten(old, f *Flag) (bool, error) {
 }
 
 func anchorOf(target string, revision, topic, path, sectionName, sectionPackage *string) Anchor {
-	a := Anchor{Target: target, Commit: revision, Topic: topic, Path: path}
-	if sectionName != nil {
-		a.Section = &SectionName{Name: *sectionName, Package: sectionPackage}
-	}
-	return a
+	return Anchor{Target: target, Commit: revision, Topic: topic, Path: path, Section: sectionRef(sectionName, sectionPackage)}
 }
 
 func feedbackItem(fb *Feedback, lines map[flagKey]Range) *sheetItem {
@@ -810,7 +804,7 @@ func (c *sheetContext) guideItem() *sheetItem {
 // BuildSheet is the latest iteration's sheet: the items still to do, or,
 // with all, every item.
 func BuildSheet(d *DB, repo *git.Repo, j *Journal, all bool) (*Sheet, error) {
-	c, err := loadSheetContext(d, repo, j)
+	c, err := loadSheetContext(d, repo, j, j.Warn)
 	if err != nil {
 		return nil, err
 	}
@@ -844,7 +838,7 @@ func openReview(file string, warn io.Writer) (*DB, *git.Repo, *Journal, error) {
 	return d, repo, j, nil
 }
 
-func runSheet(args []string, out, warn io.Writer) error {
+func runSheet(args []string, in io.Reader, out, warn io.Writer) error {
 	var all bool
 	o := newOptions()
 	o.flag("all", &all)

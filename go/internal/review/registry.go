@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"unicode/utf8"
 
 	"github.com/exodist/Review-Helper/go/internal/git"
 )
@@ -63,6 +64,10 @@ func (r *Registry) Register(id, path, state string) error {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return err
+	}
+	// The registry holds paths as JSON text, which cannot keep other bytes.
+	if !utf8.ValidString(abs) {
+		return fmt.Errorf("review file paths must be valid UTF-8: %q", abs)
 	}
 	return r.update(func(reviews map[string]RegEntry) error {
 		reviews[id] = RegEntry{Path: abs, State: state}

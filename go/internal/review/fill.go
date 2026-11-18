@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"slices"
 	"sort"
 	"strings"
@@ -68,7 +67,7 @@ var namesEntry = map[string]bool{"commit": true, "order": true, "note": true, "g
 
 // Fill validates a filled sheet (JSON text) and writes it.
 func Fill(d *DB, repo *git.Repo, j *Journal, data []byte) (*FillResult, error) {
-	c, err := loadSheetContext(d, repo, j)
+	c, err := loadSheetContext(d, repo, j, j.Warn)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +112,8 @@ func Fill(d *DB, repo *git.Repo, j *Journal, data []byte) (*FillResult, error) {
 		}
 	}
 
-	after, err := loadSheetContext(d, repo, j)
+	// The notes were warned about above.
+	after, err := loadSheetContext(d, repo, j, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -242,16 +242,7 @@ func (v *validator) match(n int, raw json.RawMessage, byID map[string]*sheetItem
 	if r, _ := jsonText(in["rev"]); r != item.Rev {
 		problems = append(problems, id+": stale revision; get a new sheet")
 	}
-	var unknown []string
-	for k := range fields {
-		if !slices.Contains(item.fields, k) {
-			unknown = append(unknown, k)
-		}
-	}
-	sort.Strings(unknown)
-	for _, k := range unknown {
-		problems = append(problems, fmt.Sprintf("%s: unknown field '%s'", id, k))
-	}
+	problems = append(problems, unknownFields(fields, id+": ", item.fields...)...)
 	if len(problems) > 0 {
 		return nil, problems
 	}
@@ -457,7 +448,7 @@ func (v *validator) checkNote(it *sheetItem, fields map[string]json.RawMessage) 
 	v.plan.notes[n.ID.Value] = e
 	return func(tx *sql.Tx) error {
 		_, err := tx.Exec(`INSERT INTO flag (note_id, commit_id, path, line_start, line_end, color, kind, sentence, detail, created)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, n.ID.Value, e.ID, path, start, end, n.Flag.Value, n.Kind.Value, n.Sentence.Value, n.Detail.Ptr(), n.CreatedAt())
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, n.ID.Value, e.ID, path, start, end, n.Flag.Value, n.Kind.Value, n.Sentence.Value, n.Detail.Ptr(), n.Created.Seconds)
 		return err
 	}, nil
 }
@@ -599,7 +590,7 @@ func fileRange(f *sheetFile, side string, raw json.RawMessage) (Range, string) {
 	return r, ""
 }
 
-func runFill(args []string, out, warn io.Writer) error {
+func runFill(args []string, in io.Reader, out, warn io.Writer) error {
 	o := newOptions()
 	rest, err := o.parse(args)
 	if err != nil {
@@ -609,12 +600,7 @@ func runFill(args []string, out, warn io.Writer) error {
 		return errors.New("usage: review-helper fill FILE SHEET")
 	}
 	file, sheetFile := rest[0], rest[1]
-	var data []byte
-	if sheetFile == "-" {
-		data, err = io.ReadAll(os.Stdin)
-	} else {
-		data, err = os.ReadFile(sheetFile)
-	}
+	data, err := readInput(sheetFile, in)
 	if err != nil {
 		return fmt.Errorf("cannot read '%s': %w", sheetFile, err)
 	}

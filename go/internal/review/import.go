@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -67,7 +68,15 @@ func ParseExport(data []byte) (*ReviewExport, string, error) {
 	}
 
 	x := &ReviewExport{Format: ExportFormat, FormatVersion: ExportFormatVersion, Tables: map[string]*ExportTable{}}
+	// Tables this version does not export, x_ ones among them, are ignored.
+	exported, err := exportedTables()
+	if err != nil {
+		return nil, "", err
+	}
 	for name, b := range raw {
+		if !slices.Contains(exported, name) {
+			continue
+		}
 		t, err := decodeTable(name, b)
 		if err != nil {
 			return nil, "", err
@@ -506,7 +515,7 @@ func checkReferences(tx *sql.Tx) error {
 	return fmt.Errorf("table '%s' has a row that refers to a missing '%s' row", table, parent)
 }
 
-func runImport(args []string, out, warn io.Writer) error {
+func runImport(args []string, in io.Reader, out, warn io.Writer) error {
 	var file string
 	o := newOptions()
 	o.path("file", &file)
@@ -518,13 +527,10 @@ func runImport(args []string, out, warn io.Writer) error {
 		return errors.New("usage: review-helper import JSON [--file P]")
 	}
 	src, name := rest[0], ""
-	var data []byte
-	if src == "-" {
-		data, err = io.ReadAll(os.Stdin)
-	} else {
-		data, err = os.ReadFile(src)
+	if src != "-" {
 		name = strings.TrimSuffix(filepath.Base(src), ".json")
 	}
+	data, err := readInput(src, in)
 	if err != nil {
 		return err
 	}

@@ -50,7 +50,6 @@ type Span struct {
 	Ranges, DocRanges, OldRanges [][2]int
 	Deleted                      bool
 	Counts
-	Touched bool
 }
 
 func ip(n int) *int { return &n }
@@ -60,9 +59,11 @@ var hunkHeader = regexp.MustCompile(`^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@
 // ParseDiff parses diff text. An empty diff (a rename or mode change alone)
 // has no hunks; "\ No newline at end of file" markers are dropped.
 func ParseDiff(text string) (*Diff, error) {
-	lines := strings.Split(text, "\n")
-	for len(lines) > 0 && lines[len(lines)-1] == "" {
-		lines = lines[:len(lines)-1]
+	// Only the newline ending the text: an empty last line is a context line
+	// whose space diff.suppressBlankEmpty stripped.
+	lines := strings.Split(strings.TrimSuffix(text, "\n"), "\n")
+	if text == "" {
+		lines = nil
 	}
 	d := &Diff{Hunks: []*Hunk{}}
 	for i := 0; i < len(lines); {
@@ -151,10 +152,10 @@ func CountLines(hunks []*Hunk) Counts {
 	return c
 }
 
-// Attribute sets each section's counts and Touched from the diff.
+// Attribute sets each section's counts from the diff.
 func Attribute(hunks []*Hunk, sections []*Span) {
 	for _, s := range sections {
-		s.Counts, s.Touched = Counts{}, false
+		s.Counts = Counts{}
 	}
 	owners := LineOwners(hunks, sections)
 	for h, hunk := range hunks {
@@ -178,7 +179,6 @@ func Attribute(hunks []*Hunk, sections []*Span) {
 			}
 			for _, o := range order {
 				tally(&sections[o].Counts, per[o][0], per[o][1])
-				sections[o].Touched = true
 			}
 		}
 	}

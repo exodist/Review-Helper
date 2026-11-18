@@ -41,8 +41,13 @@ when a second implementation exists.
   the owner.
 - No commands, options, routes or fields beyond the standard; an extension
   would be named `x-go-...` (`standards/CLI.md`, "Extensions").
-- Native Windows is unsupported: the binary builds there, but
-  `review-helper` is a POSIX `sh` script (`PLANNED_TODO.md`).
+- Windows is supported only through WSL: the binary does not build for
+  Windows (file locking uses `flock`), and the `review-helper` command is a
+  POSIX `sh` script that would not run a `.exe` (`PLANNED_TODO.md`, "More
+  backends").
+- `doc_html` (rendered documentation beside a section) is not implemented;
+  it is optional (`standards/API.md`, `GET /api/file/ID`), and the page then
+  shows the documentation's lines.
 
 ---
 
@@ -59,10 +64,17 @@ and the page drive over both fixtures (`conformance/README.md`,
 "Fixtures"), built and served by this backend. `make go-test` runs all but
 the page drive.
 
-The conformance checks are the behavioral contract. Unit tests cover only
-what they cannot reach or pin precisely: diff parsing and attribution, split
-and range edge cases, sheet refusals, git output parsing. A behavior every
-backend must have, that conformance misses, is added to `conformance/`.
+The conformance checks are the behavioral contract. Unit tests cover what
+they cannot reach or pin precisely: diff parsing, attribution and section
+hunks (`diff_test.go`), the `rev` hash and line ranges (`sheet_test.go`),
+a split's refusals and layout (`fill_split_test.go`), topics and guide
+checks (`fill_topics_test.go`, `fill_guide_test.go`), merge nesting and
+flag line moves (`builder_test.go`), the publish prefixes and line fit
+(`publish_test.go`), the export layout (`export_test.go`), import names
+(`import_test.go`), and the access layer's host check, token and static
+paths (`server_test.go`). A test lives in the `_test.go` file of the code
+it tests. A behavior every backend must
+have, that conformance misses, is added to `conformance/`.
 
 Gates for every change: `gofmt -l .` prints nothing, `go vet ./...` is
 clean, and the tests above pass.

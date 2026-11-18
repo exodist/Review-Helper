@@ -3,16 +3,17 @@ package review
 import (
 	"bytes"
 	"encoding/json"
-	"regexp"
-	"sort"
-	"strconv"
+	"fmt"
+	"maps"
+	"slices"
 )
 
 // Reading the JSON an agent returns in a sheet, value by value, and the
 // canonical form revs and stored guide steps use.
 
-// canonicalJSON encodes v compactly with object keys sorted and numbers as
-// written.
+// canonicalJSON encodes v compactly with object keys sorted, numbers as
+// written, and U+2028 and U+2029 raw, as the Perl backend writes them (Go
+// escapes them even with HTML escaping off).
 func canonicalJSON(v any) ([]byte, error) {
 	b, err := MarshalJSON(v)
 	if err != nil {
@@ -24,7 +25,39 @@ func canonicalJSON(v any) ([]byte, error) {
 	if err := dec.Decode(&generic); err != nil {
 		return nil, err
 	}
-	return MarshalJSON(generic)
+	if b, err = MarshalJSON(generic); err != nil {
+		return nil, err
+	}
+	return rawLineSeparators(b), nil
+}
+
+// rawLineSeparators writes the \u2028 and \u2029 escapes of encoded JSON
+// as the characters. An escape is one only where the backslash is not
+// itself escaped.
+func rawLineSeparators(b []byte) []byte {
+	if !bytes.Contains(b, []byte(`\u202`)) {
+		return b
+	}
+	out := make([]byte, 0, len(b))
+	for i := 0; i < len(b); i++ {
+		if b[i] != '\\' {
+			out = append(out, b[i])
+			continue
+		}
+		// Valid JSON has a character after every backslash.
+		switch string(b[i:min(i+6, len(b))]) {
+		case `\u2028`:
+			out = append(out, "\u2028"...)
+			i += 5
+		case `\u2029`:
+			out = append(out, "\u2029"...)
+			i += 5
+		default: // any other escape, \\ included, kept whole
+			out = append(out, b[i], b[i+1])
+			i++
+		}
+	}
+	return out
 }
 
 // jsonKeys lists the keys v encodes as an object, sorted.
@@ -37,12 +70,19 @@ func jsonKeys(v any) ([]string, error) {
 	if err := json.Unmarshal(b, &obj); err != nil {
 		return nil, err
 	}
-	keys := make([]string, 0, len(obj))
-	for k := range obj {
-		keys = append(keys, k)
+	return slices.Sorted(maps.Keys(obj)), nil
+}
+
+// unknownFields is one problem per key of obj that is not known, in key
+// order, each led by prefix.
+func unknownFields(obj map[string]json.RawMessage, prefix string, known ...string) []string {
+	var problems []string
+	for _, k := range slices.Sorted(maps.Keys(obj)) {
+		if !slices.Contains(known, k) {
+			problems = append(problems, fmt.Sprintf("%sunknown field '%s'", prefix, k))
+		}
 	}
-	sort.Strings(keys)
-	return keys, nil
+	return problems
 }
 
 // isNull reports whether a value is absent or null.
@@ -128,17 +168,15 @@ func texts(raw json.RawMessage) ([]string, bool) {
 	return out, true
 }
 
-var lineNumber = regexp.MustCompile(`\A[1-9][0-9]*\z`)
-
 // lineValue is a line number: a positive whole number, or a string of
 // decimal digits with no leading zero.
 func lineValue(raw json.RawMessage) (int, bool) {
 	s, ok := jsonText(raw)
-	if !ok || !lineNumber.MatchString(s) {
+	if !ok {
 		return 0, false
 	}
-	n, err := strconv.Atoi(s)
-	return n, err == nil
+	n, ok := parsePositive(s)
+	return int(n), ok
 }
 
 // lineRange reads [start, end]; the problem is "" when it is one.

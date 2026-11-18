@@ -1695,8 +1695,8 @@ try {
     await arrow('ArrowRight');
     check('an arrow key picks unified, which takes the focus', await waitFor(`!!${q(unitSel + '.unified')} && document.activeElement === ${q('#diff_toggle button[data-value="unified"]')}`)
         && await layout() === 'radio:true:0,radio:false:-1', await layout());
-    // doc_html is optional (API.md): rendered when the backend sends it, else
-    // the documentation's lines.
+    // doc_html is optional (standards/API.md, GET /api/file/ID): rendered
+    // when the backend sends it, else the documentation's lines.
     if ((await sections(f4)).find(s => s.id === s22).doc_html != null) {
         check('the documentation beside the summary is rendered POD', await waitFor(`${q(`#s${s22} .docs .pod h2`)}?.textContent === 'name' && ${q(`#s${s22} .docs .pod code`)}?.textContent === 'anon' && !${q(`#s${s22} .docs table`)}`));
     }

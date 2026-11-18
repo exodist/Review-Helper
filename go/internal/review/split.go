@@ -11,34 +11,25 @@ import (
 // File kinds (standards/FORMAT.md, "File kind") and the layout of an
 // agent's split of a file into sections.
 
-var kindByExt = map[string]string{}
-
-func init() {
-	add := func(kind string, exts ...string) {
-		for _, e := range exts {
-			kindByExt[e] = kind
-		}
-	}
-	add("perl", "pm", "pl", "t", "psgi", "pod")
-	add("javascript", "js", "mjs", "cjs", "jsx")
-	add("typescript", "ts", "mts", "cts", "tsx")
-	add("html", "html", "htm")
-	add("xml", "xml", "xsd", "xsl", "xslt")
-	add("markdown", "md", "markdown")
-	add("shell", "sh", "bash", "zsh", "ksh", "bashrc", "zshrc", "bash_profile")
-	add("yaml", "yml", "yaml")
-	add("ini", "ini", "cfg")
-	add("python", "py", "pyi")
-	add("ruby", "rb", "rake", "gemspec")
-	add("c", "c", "h")
-	add("cpp", "cpp", "cc", "cxx", "hpp", "hh", "hxx")
-	add("diff", "diff", "patch")
-	add("image", "png", "jpg", "jpeg", "gif", "webp", "bmp", "ico")
-	for _, k := range []string{"css", "sql", "json", "toml", "go", "java"} {
-		kindByExt[k] = k
-	}
-	kindByExt["rs"] = "rust"
-	kindByExt["mk"] = "makefile"
+var kindByExt = map[string]string{
+	"pm": "perl", "pl": "perl", "t": "perl", "psgi": "perl", "pod": "perl",
+	"js": "javascript", "mjs": "javascript", "cjs": "javascript", "jsx": "javascript",
+	"ts": "typescript", "mts": "typescript", "cts": "typescript", "tsx": "typescript",
+	"html": "html", "htm": "html",
+	"xml": "xml", "xsd": "xml", "xsl": "xml", "xslt": "xml",
+	"md": "markdown", "markdown": "markdown",
+	"sh": "shell", "bash": "shell", "zsh": "shell", "ksh": "shell", "bashrc": "shell", "zshrc": "shell", "bash_profile": "shell",
+	"yml": "yaml", "yaml": "yaml",
+	"ini": "ini", "cfg": "ini",
+	"py": "python", "pyi": "python",
+	"rb": "ruby", "rake": "ruby", "gemspec": "ruby",
+	"c": "c", "h": "c",
+	"cpp": "cpp", "cc": "cpp", "cxx": "cpp", "hpp": "cpp", "hh": "cpp", "hxx": "cpp",
+	"diff": "diff", "patch": "diff",
+	"png": "image", "jpg": "image", "jpeg": "image", "gif": "image", "webp": "image", "bmp": "image", "ico": "image",
+	"css": "css", "sql": "sql", "json": "json", "toml": "toml", "go": "go", "java": "java",
+	"rs": "rust",
+	"mk": "makefile",
 }
 
 var kindByName = map[string]string{"makefile": "makefile", "gnumakefile": "makefile", "dockerfile": "dockerfile"}
@@ -115,12 +106,12 @@ type Unit struct {
 	Deleted   bool
 }
 
-// Assemble lays out an agent's units as the file's sections. A run of lines
-// in no unit must be all blank: it joins the section holding the line
-// before it (the line after it at the top of the file), in code or
-// documentation like that line. Units must not share lines. Deleted units
-// (no lines) are kept, after the live ones are placed; no units: the file
-// is left whole.
+// Assemble lays out an agent's live units (each with code lines) as the
+// file's sections, in file order. A run of lines in no unit must be all
+// blank: it joins the section holding the line before it (the line after
+// it at the top of the file), in code or documentation like that line.
+// Units must not share lines, and their ranges must lie inside the file.
+// No units: the file is left whole.
 func Assemble(units []*Unit, lines []string) ([]*Unit, error) {
 	if len(units) == 0 {
 		return []*Unit{}, nil
@@ -134,14 +125,10 @@ func Assemble(units []*Unit, lines []string) ([]*Unit, error) {
 	code := make([]bool, len(lines)+2)
 	for _, s := range sections {
 		for _, l := range rangeLines(s.Ranges) {
-			if l < len(owner) {
-				owner[l], code[l] = s, true
-			}
+			owner[l], code[l] = s, true
 		}
 		for _, l := range rangeLines(s.DocRanges) {
-			if l < len(owner) {
-				owner[l] = s
-			}
+			owner[l] = s
 		}
 	}
 	var free []int
@@ -161,32 +148,23 @@ func Assemble(units []*Unit, lines []string) ([]*Unit, error) {
 		if first > 1 {
 			next = first - 1
 		}
-		if next >= len(owner) || owner[next] == nil {
+		host := owner[next]
+		if host == nil {
 			continue
 		}
-		host := owner[next]
-		joined := make([]int, 0)
-		for l := first; l <= final; l++ {
-			joined = append(joined, l)
-		}
+		part := &host.DocRanges
 		if code[next] {
-			host.Ranges = ToRanges(append(rangeLines(host.Ranges), joined...))
-		} else {
-			host.DocRanges = ToRanges(append(rangeLines(host.DocRanges), joined...))
+			part = &host.Ranges
 		}
+		*part = ToRanges(append(rangeLines(*part), rangeLines([][2]int{run})...))
 	}
 	sort.SliceStable(sections, func(i, j int) bool { return firstLine(sections[i]) < firstLine(sections[j]) })
 	return sections, nil
 }
 
-// firstLine is where a section starts in the file; a deleted one, with no
-// lines, sorts first as in the Perl backend (its first line is undefined,
-// so numerically 0).
+// firstLine is where a live section starts in the file.
 func firstLine(s *Unit) int {
-	first := 0
-	if len(s.Ranges) > 0 {
-		first = s.Ranges[0][0]
-	}
+	first := s.Ranges[0][0]
 	if len(s.DocRanges) > 0 && s.DocRanges[0][0] < first {
 		return s.DocRanges[0][0]
 	}

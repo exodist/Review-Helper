@@ -2,9 +2,9 @@ package review
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 )
 
 // The publish list (standards/FORMAT.md, "Publish list"): the feedback to
@@ -237,30 +237,21 @@ func (d *DB) lineFits(latest *Iteration, f *Feedback, side string) (bool, error)
 	err := d.QueryRow(`SELECT file_change.old_path FROM commit_entry JOIN file_change ON file_change.commit_id = commit_entry.id
 	 WHERE commit_entry.iteration = ? AND commit_entry.revision = ? AND file_change.path = ? AND file_change.old_path IS NOT NULL`,
 		latest.Number, revision, path).Scan(&renamed)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return false, err
 	}
 	if renamed.Valid {
 		paths = append(paths, renamed.String)
 	}
-	in := strings.TrimSuffix(strings.Repeat("?, ", len(paths)), ", ")
+	in := placeholders(len(paths))
 
 	var changed int
 	args := append(append([]any{latest.Number, revision, position.Int64}, paths...), paths...)
 	err = d.QueryRow(`SELECT COUNT(*) FROM commit_entry JOIN file_change ON file_change.commit_id = commit_entry.id
 	 WHERE commit_entry.iteration = ? AND commit_entry.revision != ? AND commit_entry.position `+compare+` ?
-	   AND (file_change.path IN (`+in+`) OR file_change.old_path IN (`+in+`))`, args...).Scan(&changed)
+	   AND (file_change.path IN `+in+` OR file_change.old_path IN `+in+`)`, args...).Scan(&changed)
 	if err != nil {
 		return false, err
 	}
 	return changed == 0, nil
-}
-
-// deref is the value p points at, or the zero value for nil.
-func deref[T any](p *T) T {
-	var zero T
-	if p == nil {
-		return zero
-	}
-	return *p
 }

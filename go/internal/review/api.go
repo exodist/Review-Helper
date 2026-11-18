@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"regexp"
-	"strconv"
 )
 
 // The JSON of /api/review and its parts. Field names and values are those
@@ -224,8 +223,8 @@ func (s *Server) queryIteration(r *http.Request) (*Iteration, error) {
 		return s.iteration(nil)
 	}
 	v := q.Get("iteration")
-	n, err := strconv.ParseInt(v, 10, 64)
-	if !positiveInt.MatchString(v) || err != nil {
+	n, ok := parsePositive(v)
+	if !ok {
 		return nil, badRequest("'iteration' must be a positive integer")
 	}
 	return s.iteration(&n)
@@ -481,21 +480,7 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request) error {
 
 // diffOf is the file change's diff, parsed.
 func (s *Server) diffOf(f *FileChange, c *CommitEntry) (*Diff, error) {
-	from := ""
-	if c.Parent != nil {
-		from = *c.Parent
-	} else {
-		empty, err := s.repo.EmptyRevision()
-		if err != nil {
-			return nil, err
-		}
-		from = empty
-	}
-	raw, err := s.repo.RangeDiff(from, c.Revision, f.Path, deref(f.OldPath))
-	if err != nil {
-		return nil, err
-	}
-	return ParseDiff(string(raw))
+	return commitDiff(s.repo, deref(c.Parent), c.Revision, f.Path, deref(f.OldPath))
 }
 
 func (s *Server) getDiff(w http.ResponseWriter, r *http.Request) error {
@@ -507,8 +492,8 @@ func (s *Server) getDiff(w http.ResponseWriter, r *http.Request) error {
 	var sectionID int64
 	if q.Has("section") {
 		v := q.Get("section")
-		id, err := strconv.ParseInt(v, 10, 64)
-		if !allDigits(v) || err != nil {
+		id, ok := parseDigits(v)
+		if !ok {
 			return badRequest("Invalid section id")
 		}
 		sectionID = id
@@ -539,11 +524,7 @@ func (s *Server) getDiff(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	hunks := SectionHunks(d.Hunks, lines, spans, index)
-	if hunks == nil {
-		hunks = []*Hunk{}
-	}
-	return writeJSON(w, http.StatusOK, &Diff{Binary: d.Binary, Hunks: hunks})
+	return writeJSON(w, http.StatusOK, &Diff{Binary: d.Binary, Hunks: SectionHunks(d.Hunks, lines, spans, index)})
 }
 
 // newLines are the file's lines after the commit; none when it is deleted.
@@ -577,10 +558,10 @@ type resolutionKey struct{ revision, paths string }
 // may be fetched while the server runs.
 func (s *Server) resolutionsOf(revision string, it *Iteration) ([]*ResolutionFile, error) {
 	key := resolutionKey{revision, MustJSON(it.Paths)}
-	// Held throughout: git access caches what it probes, unguarded.
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if files, ok := s.resolutions[key]; ok {
+	files, ok := s.resolutions[key]
+	s.mu.Unlock()
+	if ok {
 		return files, nil
 	}
 	ok, err := s.repo.HasRevision(revision)
@@ -591,7 +572,7 @@ func (s *Server) resolutionsOf(revision string, it *Iteration) ([]*ResolutionFil
 	if err != nil {
 		return nil, err
 	}
-	files := make([]*ResolutionFile, 0, len(changes))
+	files = make([]*ResolutionFile, 0, len(changes))
 	for _, ch := range changes {
 		raw, err := s.repo.ResolutionDiff(revision, ch.Path, ch.OldPath)
 		if err != nil {
@@ -607,7 +588,9 @@ func (s *Server) resolutionsOf(revision string, it *Iteration) ([]*ResolutionFil
 		}
 		files = append(files, rf)
 	}
+	s.mu.Lock()
 	s.resolutions[key] = files
+	s.mu.Unlock()
 	return files, nil
 }
 
@@ -676,8 +659,8 @@ func (s *Server) getContent(w http.ResponseWriter, r *http.Request) error {
 	h.Set("Content-Type", ct)
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Content-Security-Policy", "sandbox")
-	_, err = w.Write(b)
-	return err
+	writeBody(w, b)
+	return nil
 }
 
 func (s *Server) getFeedback(w http.ResponseWriter, r *http.Request) error {

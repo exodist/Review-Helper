@@ -9,6 +9,8 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -69,4 +71,32 @@ func MarshalJSONIndent(v any) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// deref is the value p points at, or the zero value for nil.
+func deref[T any](p *T) T {
+	if p == nil {
+		var zero T
+		return zero
+	}
+	return *p
+}
+
+// parseDigits reads a whole number written only in ASCII decimal digits:
+// no sign, space or prefix, which strconv alone would take. ok is false for
+// anything else, or a number too large for an int64.
+func parseDigits(s string) (n int64, ok bool) {
+	if s == "" || strings.Trim(s, "0123456789") != "" {
+		return 0, false
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	return n, err == nil
+}
+
+// parsePositive is parseDigits for a positive number with no leading zero.
+func parsePositive(s string) (int64, bool) {
+	if strings.HasPrefix(s, "0") {
+		return 0, false
+	}
+	return parseDigits(s)
 }

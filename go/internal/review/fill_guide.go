@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"slices"
-	"sort"
 	"unicode/utf8"
 )
 
@@ -67,17 +65,7 @@ func (v *validator) checkStep(raw json.RawMessage) (*GuideStep, []string) {
 	if !ok {
 		return nil, []string{"must be an object"}
 	}
-	var problems []string
-	var unknown []string
-	for k := range obj {
-		if k != "target" && k != "highlight" && k != "commentary" {
-			unknown = append(unknown, k)
-		}
-	}
-	sort.Strings(unknown)
-	for _, k := range unknown {
-		problems = append(problems, fmt.Sprintf("unknown field '%s'", k))
-	}
+	problems := unknownFields(obj, "", "target", "highlight", "commentary")
 	commentary, ok := isText(obj["commentary"])
 	switch {
 	case !ok:
@@ -138,18 +126,7 @@ func (v *validator) checkTarget(raw json.RawMessage) (*sheetCommit, bool, []stri
 	if !known {
 		return nil, false, []string{fmt.Sprintf("unknown type '%s'", typ)}
 	}
-	var unknown []string
-	for k := range t {
-		if k != "type" && !slices.Contains(keys, k) {
-			unknown = append(unknown, k)
-		}
-	}
-	if len(unknown) > 0 {
-		sort.Strings(unknown)
-		var problems []string
-		for _, k := range unknown {
-			problems = append(problems, fmt.Sprintf("unknown field '%s'", k))
-		}
+	if problems := unknownFields(t, "", append([]string{"type"}, keys...)...); len(problems) > 0 {
 		return nil, false, problems
 	}
 	switch typ {
@@ -248,7 +225,7 @@ func checkSectionTarget(plan *fillPlan, f *sheetFile, raw json.RawMessage) strin
 		}
 	}
 	for _, s := range sections {
-		if s.Name == name && orBlank(s.Package) == pkg {
+		if s.Name == name && deref(s.Package) == pkg {
 			if s.Touched() {
 				return ""
 			}

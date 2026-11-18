@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strconv"
 )
 
 const (
@@ -230,7 +229,7 @@ func (d *DB) flagLines() (flagLines, error) {
 	return lines, rows.Err()
 }
 
-func runFeedback(args []string, out, warn io.Writer) error {
+func runFeedback(args []string, in io.Reader, out, warn io.Writer) error {
 	var open, publish bool
 	o := newOptions()
 	o.flag("open", &open)
@@ -247,12 +246,9 @@ func runFeedback(args []string, out, warn io.Writer) error {
 	}
 	var ids []int64
 	for _, a := range rest[1:] {
-		if !positiveInt.MatchString(a) {
+		id, ok := parsePositive(a)
+		if !ok {
 			return fmt.Errorf("feedback ID must be a positive integer, got %q", a)
-		}
-		id, err := strconv.ParseInt(a, 10, 64)
-		if err != nil {
-			return err
 		}
 		ids = append(ids, id)
 	}

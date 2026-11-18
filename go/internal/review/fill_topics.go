@@ -55,6 +55,10 @@ func (v *validator) checkTopics(it *sheetItem, fields map[string]json.RawMessage
 		return nil, []string{"'topics' must be a non-empty array of { name, paths }"}
 	}
 	all := it.About.(TopicsAbout).Paths
+	inIteration := make(map[string]bool, len(all))
+	for _, p := range all {
+		inIteration[p] = true
+	}
 	var problems []string
 	names := map[string]bool{}
 	in := map[string]int{}
@@ -66,16 +70,7 @@ func (v *validator) checkTopics(it *sheetItem, fields map[string]json.RawMessage
 			problems = append(problems, fmt.Sprintf("topic %d: must be an object with 'name' and 'paths'", n))
 			continue
 		}
-		var unknown []string
-		for k := range obj {
-			if k != "name" && k != "paths" {
-				unknown = append(unknown, k)
-			}
-		}
-		sort.Strings(unknown)
-		for _, k := range unknown {
-			problems = append(problems, fmt.Sprintf("topic %d: unknown field '%s'", n, k))
-		}
+		problems = append(problems, unknownFields(obj, fmt.Sprintf("topic %d: ", n), "name", "paths")...)
 
 		name, ok := jsonText(obj["name"])
 		name = strings.TrimSpace(name)
@@ -94,7 +89,7 @@ func (v *validator) checkTopics(it *sheetItem, fields map[string]json.RawMessage
 		}
 		for _, p := range paths {
 			switch {
-			case !slices.Contains(all, p):
+			case !inIteration[p]:
 				problems = append(problems, fmt.Sprintf("topic %d: '%s' is not a path of this iteration", n, p))
 			case in[p] != 0:
 				problems = append(problems, fmt.Sprintf("topic %d: '%s' is already in topic %d", n, p, in[p]))

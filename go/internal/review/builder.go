@@ -63,7 +63,7 @@ func (b *builder) warnf(format string, args ...any) {
 	fmt.Fprintf(b.warn, format+"\n", args...)
 }
 
-func runBuild(args []string, out, warn io.Writer) error {
+func runBuild(args []string, in io.Reader, out, warn io.Writer) error {
 	var base, head, title, source, file string
 	var squash bool
 	var paths []string
@@ -104,7 +104,7 @@ func runBuild(args []string, out, warn io.Writer) error {
 	return nil
 }
 
-func runIterate(args []string, out, warn io.Writer) error {
+func runIterate(args []string, in io.Reader, out, warn io.Writer) error {
 	var base, head string
 	o := newOptions()
 	o.str("base", &base)
@@ -363,11 +363,9 @@ func (b *builder) collectCommit(revision string, merge bool, paths []string) (*n
 	if merge {
 		return e, nil
 	}
-	from := info.Parent
-	if from == "" {
-		if from, err = b.repo.EmptyRevision(); err != nil {
-			return nil, err
-		}
+	from, err := b.repo.ParentOrEmpty(info.Parent)
+	if err != nil {
+		return nil, err
 	}
 	changes, err := b.repo.RangeChanges(from, revision, paths)
 	if err != nil {
@@ -449,19 +447,9 @@ func (b *builder) collectFile(info *git.RevisionInfo, c *git.Change) (*newFile, 
 	}
 	f.SizeUnit = "lines"
 	f.SizeBefore, f.SizeAfter = lineSize(before), lineSize(after)
-	from := info.Parent
-	if from == "" {
-		if from, err = b.repo.EmptyRevision(); err != nil {
-			return nil, err
-		}
-	}
-	raw, err := b.repo.RangeDiff(from, info.Revision, c.Path, c.OldPath)
+	d, err := commitDiff(b.repo, info.Parent, info.Revision, c.Path, c.OldPath)
 	if err != nil {
 		return nil, err
-	}
-	d, err := ParseDiff(string(raw))
-	if err != nil {
-		return nil, fmt.Errorf("diff of %s: %w", c.Path, err)
 	}
 	n := CountLines(d.Hunks)
 	f.Added, f.Removed, f.Changed = int64(n.Added), int64(n.Removed), int64(n.Changed)
@@ -634,8 +622,8 @@ func (b *builder) journalEntries() ([]*Note, error) {
 		if n.Flag.Set {
 			continue
 		}
-		if problem := n.Problem(); problem != "" {
-			b.warnf("skipping journal entry %s: %s", n.ID.Value, problem)
+		if err := n.Problem(); err != nil {
+			b.warnf("skipping journal entry %s: %s", n.ID.Value, err)
 			continue
 		}
 		entries = append(entries, n)
@@ -648,7 +636,7 @@ func (b *builder) journalEntries() ([]*Note, error) {
 func storeJournal(tx *sql.Tx, number int64, notes []*Note) error {
 	for _, n := range notes {
 		if _, err := tx.Exec("INSERT OR IGNORE INTO journal_entry (id, iteration, kind, path, unit, sentence, detail, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-			n.ID.Value, number, n.Kind.Value, n.Path.Value, n.Unit.Ptr(), n.Sentence.Value, n.Detail.Ptr(), n.CreatedAt()); err != nil {
+			n.ID.Value, number, n.Kind.Value, n.Path.Value, n.Unit.Ptr(), n.Sentence.Value, n.Detail.Ptr(), n.Created.Seconds); err != nil {
 			return fmt.Errorf("store journal entry %s: %w", n.ID.Value, err)
 		}
 	}
@@ -691,7 +679,7 @@ func (b *builder) storeEntries(tx *sql.Tx, number int64, entries []*newEntry) er
 			return fmt.Errorf("merge %s of %s is not in the iteration", e.mergeRevision, e.Revision)
 		}
 		if _, err := tx.Exec("UPDATE commit_entry SET merge_id = ? WHERE id = ?", merge, e.ID); err != nil {
-			return err
+			return fmt.Errorf("link commit %s to its merge: %w", e.Revision, err)
 		}
 	}
 	return nil
@@ -704,7 +692,11 @@ func insertEntry(tx *sql.Tx, c *CommitEntry) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("store commit %s: %w", c.Revision, err)
 	}
-	return res.LastInsertId()
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("store commit %s: %w", c.Revision, err)
+	}
+	return id, nil
 }
 
 func insertFile(tx *sql.Tx, commitID int64, f *newFile) error {
@@ -716,7 +708,7 @@ func insertFile(tx *sql.Tx, commitID int64, f *newFile) error {
 	}
 	fileID, err := res.LastInsertId()
 	if err != nil {
-		return err
+		return fmt.Errorf("store file %s: %w", f.Path, err)
 	}
 	for i, s := range f.Sections {
 		if _, err := tx.Exec(`INSERT INTO section (file_id, position, name, package, ranges, doc_ranges, old_ranges, deleted, added, removed, changed, what)
@@ -757,8 +749,12 @@ func (b *builder) defaultFile(rev, revision string) (string, error) {
 	base := reviewFileName(revision, name)
 	file := filepath.Join(dir, base+".sqlite")
 	for n := 2; ; n++ {
-		if _, err := os.Stat(file); errors.Is(err, os.ErrNotExist) {
+		_, err := os.Stat(file)
+		if errors.Is(err, os.ErrNotExist) {
 			return file, nil
+		}
+		if err != nil {
+			return "", fmt.Errorf("choose a review file name: %w", err)
 		}
 		file = filepath.Join(dir, fmt.Sprintf("%s-%d.sqlite", base, n))
 	}
@@ -777,4 +773,22 @@ func reviewFileName(revision, name string) string {
 		return short
 	}
 	return strings.ReplaceAll(name, "/", "-")
+}
+
+// commitDiff is one file's diff in a commit, parsed: against the commit's
+// parent, or the empty tree for a root commit (parent "").
+func commitDiff(repo *git.Repo, parent, revision, path, oldPath string) (*Diff, error) {
+	from, err := repo.ParentOrEmpty(parent)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := repo.RangeDiff(from, revision, path, oldPath)
+	if err != nil {
+		return nil, err
+	}
+	d, err := ParseDiff(string(raw))
+	if err != nil {
+		return nil, fmt.Errorf("diff of %s: %w", path, err)
+	}
+	return d, nil
 }

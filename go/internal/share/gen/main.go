@@ -15,6 +15,11 @@ import (
 var shared = []string{"ux/html", "ux/css", "ux/js", "skills", "standards"}
 
 func main() {
+	// It removes ./files, so it runs only beside share.go, as go generate
+	// runs it.
+	if _, err := os.Stat("share.go"); err != nil {
+		log.Fatal("gen: run it in internal/share (go generate ./...): ", err)
+	}
 	root := filepath.Join("..", "..", "..")
 	if err := os.RemoveAll("files"); err != nil {
 		log.Fatal(err)

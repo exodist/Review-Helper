@@ -8,8 +8,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
+	"strconv"
 	"syscall"
 )
 
@@ -32,19 +32,11 @@ type Text struct {
 // UnmarshalJSON accepts a string, a number or null.
 func (t *Text) UnmarshalJSON(b []byte) error {
 	*t = Text{}
-	switch {
-	case string(b) == "null":
-	case len(b) > 0 && b[0] == '"':
-		t.Set = true
-		return json.Unmarshal(b, &t.Value)
-	default:
-		var n json.Number
-		if err := json.Unmarshal(b, &n); err != nil {
-			t.bad = true
-			return nil
-		}
-		t.Value, t.Set = n.String(), true
+	if isNull(b) {
+		return nil
 	}
+	t.Value, t.Set = jsonText(b)
+	t.bad = !t.Set
 	return nil
 }
 
@@ -64,45 +56,55 @@ func (t Text) Ptr() *string {
 	return &t.Value
 }
 
+// Epoch is a note's time in whole epoch seconds. A reader takes the digits
+// as a JSON number or, as the Perl backend does, a string; anything else
+// leaves it unset.
+type Epoch struct {
+	Seconds int64
+	Set     bool
+}
+
+// UnmarshalJSON reads digits, as a number or a string.
+func (e *Epoch) UnmarshalJSON(b []byte) error {
+	*e = Epoch{}
+	if s, ok := jsonText(b); ok {
+		e.Seconds, e.Set = parseDigits(s)
+	}
+	return nil
+}
+
+// MarshalJSON writes the time as a number, or null.
+func (e Epoch) MarshalJSON() ([]byte, error) {
+	if !e.Set {
+		return []byte("null"), nil
+	}
+	return strconv.AppendInt(nil, e.Seconds, 10), nil
+}
+
 // Note is one journal note. A note with Flag set becomes a flag when placed;
 // one without is a journal entry.
 type Note struct {
-	ID       Text            `json:"id"`
-	Created  json.RawMessage `json:"created"`
-	Flag     Text            `json:"flag"`
-	Kind     Text            `json:"kind"`
-	Path     Text            `json:"path"`
-	Unit     Text            `json:"unit"`
-	Snippet  Text            `json:"snippet"`
-	Sentence Text            `json:"sentence"`
-	Detail   Text            `json:"detail"`
+	ID       Text  `json:"id"`
+	Created  Epoch `json:"created"`
+	Flag     Text  `json:"flag"`
+	Kind     Text  `json:"kind"`
+	Path     Text  `json:"path"`
+	Unit     Text  `json:"unit"`
+	Snippet  Text  `json:"snippet"`
+	Sentence Text  `json:"sentence"`
+	Detail   Text  `json:"detail"`
 }
-
-// CreatedAt is the note's time, 0 when it is not whole epoch seconds.
-func (n *Note) CreatedAt() int64 {
-	var c int64
-	if json.Unmarshal(n.Created, &c) != nil {
-		return 0
-	}
-	return c
-}
-
-var digits = regexp.MustCompile(`\A\d+\z`)
 
 // Problem says what makes the note one the journal could not have written,
-// or "" when it is fine.
-func (n *Note) Problem() string {
+// or is nil when it is fine.
+func (n *Note) Problem() error {
 	if !n.ID.Set || n.ID.Value == "" {
-		return "'id' must be a non-empty string"
+		return errors.New("'id' must be a non-empty string")
 	}
-	var c json.Number
-	if json.Unmarshal(n.Created, &c) != nil || !digits.MatchString(c.String()) {
-		return "'created' must be a time in epoch seconds"
+	if !n.Created.Set {
+		return errors.New("'created' must be a time in epoch seconds")
 	}
-	if err := n.validate(); err != nil {
-		return err.Error()
-	}
-	return ""
+	return n.validate()
 }
 
 // validate checks the note's fields: kind, path and sentence required, the
@@ -161,7 +163,7 @@ func (j *Journal) Add(n Note) (string, error) {
 	}
 	id := UUID7()
 	n.ID = Text{Value: id, Set: true}
-	n.Created = json.RawMessage(fmt.Sprint(now()))
+	n.Created = Epoch{Seconds: now(), Set: true}
 	line, err := MarshalJSON(n)
 	if err != nil {
 		return "", err

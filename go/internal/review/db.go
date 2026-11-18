@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 
 	"github.com/exodist/Review-Helper/go/internal/share"
 	_ "modernc.org/sqlite"
@@ -47,7 +47,12 @@ func SchemaTables() ([]string, error) {
 }
 
 func connect(path string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(10000)")
+	// SQLite reads the name as a URI, so the path is escaped: a # or ? in it
+	// would otherwise end the path, and %HH be decoded. Transactions take the
+	// write lock when they begin, so one that reads first still waits for
+	// another writer rather than failing.
+	uri := url.URL{Scheme: "file", OmitHost: true, Path: path, RawQuery: "_pragma=foreign_keys(1)&_pragma=busy_timeout(10000)&_txlock=immediate"}
+	db, err := sql.Open("sqlite", uri.String())
 	if err != nil {
 		return nil, err
 	}
@@ -62,14 +67,10 @@ type NewReview struct {
 	Created           int64
 }
 
-// CreateDB makes a new review file from the schema.
+// CreateDB makes a new review file from the schema. The file is created
+// exclusively first, so of two builds racing for one path, one fails and
+// neither removes the other's file.
 func CreateDB(path string, r NewReview) (*DB, error) {
-	if _, err := os.Stat(path); err == nil {
-		return nil, fmt.Errorf("review file %s already exists", path)
-	}
-	if strings.Contains(path, ";") {
-		return nil, fmt.Errorf("review file paths may not contain ';': %s", path)
-	}
 	schema, err := Schema()
 	if err != nil {
 		return nil, err
@@ -77,8 +78,20 @@ func CreateDB(path string, r NewReview) (*DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o777); err != nil {
 		return nil, err
 	}
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
+	if errors.Is(err, fs.ErrExist) {
+		return nil, fmt.Errorf("review file %s already exists", path)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(path)
+		return nil, err
+	}
 	sqlDB, err := connect(path)
 	if err != nil {
+		os.Remove(path)
 		return nil, err
 	}
 	d := &DB{Path: path, DB: sqlDB}
@@ -182,7 +195,11 @@ func (d *DB) SetPublished(id int64) error {
 	if err != nil {
 		return err
 	}
-	if n, err := res.RowsAffected(); err != nil || n == 0 {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("mark feedback %d published: %w", id, err)
+	}
+	if n == 0 {
 		return fmt.Errorf("no such feedback item: %d", id)
 	}
 	return nil

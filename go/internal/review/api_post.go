@@ -7,6 +7,7 @@ package review
 import (
 	"database/sql"
 	"net/http"
+	"slices"
 	"strings"
 )
 
@@ -47,16 +48,9 @@ var (
 	requestTargets  = []string{"review", "commit", "file", "section"}
 )
 
-func oneOf(v *string, allowed ...string) bool {
-	if v == nil {
-		return false
-	}
-	for _, a := range allowed {
-		if *v == a {
-			return true
-		}
-	}
-	return false
+// idJSON answers a write that made a row.
+type idJSON struct {
+	ID int64 `json:"id"`
 }
 
 // text is a required, or when given an optional, non-blank string.
@@ -73,7 +67,7 @@ func text(v *string, name string, required bool) (*string, error) {
 // anchorOf checks a target other than flag against the iteration, and
 // returns its anchor and, for a target with a path, its file change.
 func (s *Server) anchorOf(in *anchorBody, it *Iteration, targets []string) (*anchor, *FileChange, error) {
-	if !oneOf(in.Target, targets...) {
+	if in.Target == nil || !slices.Contains(targets, *in.Target) {
 		return nil, nil, badRequest("'target' must be one of: %s", strings.Join(targets, " "))
 	}
 	a := &anchor{Target: *in.Target}
@@ -156,9 +150,9 @@ func entryTopic(topic *string, rev string, entries []*CommitEntry) (*string, err
 	return nil, badRequest("Commit '%s' is split into topics; give 'topic'", rev)
 }
 
-// addFeedback adds feedback. Feedback on a flag also marks the flag seen by
+// postFeedback adds feedback. Feedback on a flag also marks the flag seen by
 // its writer.
-func (s *Server) addFeedback(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) postFeedback(w http.ResponseWriter, r *http.Request) error {
 	var in anchorBody
 	if err := decodeBody(r, &in); err != nil {
 		return err
@@ -194,7 +188,7 @@ func (s *Server) addFeedback(w http.ResponseWriter, r *http.Request) error {
 		if in.Line == nil || *in.Line < 1 {
 			return badRequest("'line' must be a positive integer")
 		}
-		if !oneOf(in.Side, "old", "new") {
+		if in.Side == nil || !slices.Contains([]string{"old", "new"}, *in.Side) {
 			return badRequest("'side' must be 'old' or 'new'")
 		}
 		fb.Line, fb.Side = in.Line, in.Side
@@ -212,13 +206,14 @@ func (s *Server) addFeedback(w http.ResponseWriter, r *http.Request) error {
 				return err
 			}
 		}
+		var err error
 		id, err = addFeedback(tx, fb)
 		return err
 	})
 	if err != nil {
 		return err
 	}
-	return writeJSON(w, http.StatusOK, map[string]int64{"id": id})
+	return writeJSON(w, http.StatusOK, idJSON{ID: id})
 }
 
 // editFeedback edits a feedback's body or status. Only its author edits it;
@@ -241,7 +236,7 @@ func (s *Server) editFeedback(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 	}
-	if in.Status != nil && !oneOf(in.Status, "open", "addressed", "declined") {
+	if in.Status != nil && !slices.Contains([]string{"open", "addressed", "declined"}, *in.Status) {
 		return badRequest("'status' must be one of: open addressed declined")
 	}
 	if in.Body == nil && in.Status == nil {
@@ -273,7 +268,7 @@ func (s *Server) addRequest(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if !oneOf(in.Kind, "debate", "split") {
+	if in.Kind == nil || !slices.Contains([]string{"debate", "split"}, *in.Kind) {
 		return badRequest("'kind' must be one of: debate split")
 	}
 	a, file, err := s.anchorOf(&in, it, requestTargets)
@@ -299,7 +294,7 @@ func (s *Server) addRequest(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	return writeJSON(w, http.StatusOK, map[string]int64{"id": id})
+	return writeJSON(w, http.StatusOK, idJSON{ID: id})
 }
 
 // splittable refuses a file the fill sheet gives no split item: one with no
@@ -314,9 +309,9 @@ func splittable(f *FileChange) error {
 	return badRequest("'%s' has nothing to split: a rename or mode change alone leaves its content as it was", f.Path)
 }
 
-// setFlagSeen sets or removes the reviewer's seen mark on a flag and
+// postFlagSeen sets or removes the reviewer's seen mark on a flag and
 // answers who has seen it.
-func (s *Server) setFlagSeen(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) postFlagSeen(w http.ResponseWriter, r *http.Request) error {
 	id, err := idValue(r, "id")
 	if err != nil {
 		return err
@@ -354,7 +349,9 @@ func (s *Server) setFlagSeen(w http.ResponseWriter, r *http.Request) error {
 			seen = append(seen, seenJSON{Reviewer: m.Reviewer, At: m.At})
 		}
 	}
-	return writeJSON(w, http.StatusOK, map[string][]seenJSON{"seen": seen})
+	return writeJSON(w, http.StatusOK, struct {
+		Seen []seenJSON `json:"seen"`
+	}{seen})
 }
 
 // closeReview closes the review, as `close FILE` does.

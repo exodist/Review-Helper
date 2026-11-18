@@ -14,7 +14,6 @@ import (
 	"os"
 	"os/user"
 	"path"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -90,10 +89,10 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/resolution/{id}", s.handle(s.getResolution))
 	mux.Handle("GET /api/content/{rev}/{path...}", s.handle(s.getContent))
 	mux.Handle("GET /api/feedback", s.handle(s.getFeedback))
-	mux.Handle("POST /api/feedback", s.handle(post(s.addFeedback)))
+	mux.Handle("POST /api/feedback", s.handle(post(s.postFeedback)))
 	mux.Handle("POST /api/feedback/{id}", s.handle(post(s.editFeedback)))
 	mux.Handle("POST /api/request", s.handle(post(s.addRequest)))
-	mux.Handle("POST /api/flag/{id}", s.handle(post(s.setFlagSeen)))
+	mux.Handle("POST /api/flag/{id}", s.handle(post(s.postFlagSeen)))
 	mux.Handle("POST /api/close", s.handle(post(s.closeReview)))
 	// Every other route, and a known one with another method, is unknown.
 	mux.Handle("/", s.handle(func(w http.ResponseWriter, r *http.Request) error {
@@ -155,8 +154,15 @@ func writeJSON(w http.ResponseWriter, status int, v any) error {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	_, err = w.Write(b)
-	return err
+	writeBody(w, b)
+	return nil
+}
+
+// writeBody writes a response body. The status is sent by then, so a write
+// that fails, the client having gone away, leaves nothing to answer: its
+// error is dropped rather than answered a second time.
+func writeBody(w http.ResponseWriter, b []byte) {
+	_, _ = w.Write(b)
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
@@ -165,27 +171,11 @@ func writeError(w http.ResponseWriter, status int, message string) {
 
 // idValue is the route's numeric id; anything else names no route.
 func idValue(r *http.Request, name string) (int64, error) {
-	v := r.PathValue(name)
-	if !allDigits(v) {
-		return 0, notFound("Not found")
-	}
-	id, err := strconv.ParseInt(v, 10, 64)
-	if err != nil {
+	id, ok := parseDigits(r.PathValue(name))
+	if !ok {
 		return 0, notFound("Not found")
 	}
 	return id, nil
-}
-
-func allDigits(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return false
-		}
-	}
-	return true
 }
 
 // safePath reports whether rel is a relative path with no empty, "." or
@@ -275,8 +265,8 @@ func sendShared(w http.ResponseWriter, name string) error {
 		ct = "application/octet-stream"
 	}
 	w.Header().Set("Content-Type", ct)
-	_, err = w.Write(b)
-	return err
+	writeBody(w, b)
+	return nil
 }
 
 // decodeBody decodes a POST body, which must be a JSON object (an empty

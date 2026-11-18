@@ -291,7 +291,11 @@ func insertFlag(tx *sql.Tx, commitID int64, f *Flag) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("store flag %s: %w", f.NoteID, err)
 	}
-	return res.LastInsertId()
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("store flag %s: %w", f.NoteID, err)
+	}
+	return id, nil
 }
 
 // lineMoves is how lines of a file move from one commit to another.
@@ -358,7 +362,7 @@ func (b *builder) movesTo(from, to *CommitEntry, path string) (*lineMoves, error
 	if newPath == "" {
 		newPath = path
 	}
-	hunks, ok, err := b.lineMoves(from, to, path, newPath)
+	hunks, ok, err := b.moveDiff(from, to, path, newPath)
 	if err != nil {
 		return nil, err
 	}
@@ -432,12 +436,12 @@ func (b *builder) renamedTo(from, to *CommitEntry, path string) (string, error) 
 	return "", nil
 }
 
-// lineMoves is the diff from path in one commit to toPath in another, so
+// moveDiff is the diff from path in one commit to toPath in another, so
 // line numbers in one can be moved to the other; no hunks when they read the
 // same. A file in neither commit (deleted by both) is compared as it was
 // before them. ok is false when the file is on one side only, or is a binary
 // file that changed.
-func (b *builder) lineMoves(from, to *CommitEntry, path, toPath string) ([]*Hunk, bool, error) {
+func (b *builder) moveDiff(from, to *CommitEntry, path, toPath string) ([]*Hunk, bool, error) {
 	if from.Revision == to.Revision {
 		return nil, true, nil
 	}
@@ -517,7 +521,7 @@ func (b *builder) carryUnpairedFlags(tx *sql.Tx, number int64, entries []*newEnt
 			if to == nil {
 				to, f.LineStart, f.LineEnd = newest, nil, nil
 			} else if f.LineStart != nil {
-				hunks, ok, err := b.lineMoves(from, &to.CommitEntry, *f.Path, *f.Path)
+				hunks, ok, err := b.moveDiff(from, &to.CommitEntry, *f.Path, *f.Path)
 				if err != nil {
 					return err
 				}
@@ -569,10 +573,10 @@ func flagsOffChange(tx *sql.Tx, number int64) error {
 	}
 	for _, id := range ids {
 		if _, err := tx.Exec("UPDATE flag SET pending = 1 WHERE id = ?", *id); err != nil {
-			return err
+			return fmt.Errorf("mark flag %d pending: %w", *id, err)
 		}
 		if _, err := tx.Exec("DELETE FROM flag_seen WHERE flag = ?", *id); err != nil {
-			return err
+			return fmt.Errorf("clear the seen marks of flag %d: %w", *id, err)
 		}
 	}
 	return nil

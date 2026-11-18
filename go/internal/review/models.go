@@ -3,6 +3,7 @@ package review
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -329,7 +330,7 @@ func queryAll[T any](x querier, scan func(scanner) (*T, error), query string, ar
 // queryOne scans the first row, or returns nil when there is none.
 func queryOne[T any](x querier, scan func(scanner) (*T, error), query string, args ...any) (*T, error) {
 	v, err := scan(x.QueryRow(query, args...))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return v, err

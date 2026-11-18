@@ -21,6 +21,24 @@ see `~/projects/Agents/AGENTS.md` under "What earns a place in `RULINGS.md`".
 
 ---
 
+## 2026-11-18 — Backends that cannot follow symlinks copy the shared files at build time
+
+**Ruling (owner): amends "The repository is a standard, a page and skills;
+Perl is one backend" (2026-11-11). Go's `go:embed` refuses symlinks, so the
+Go backend gets `ux/`, `skills/` and `standards/` as copies a Go generator
+(`go generate`) makes in a gitignored directory under `go/`; the copies are
+never committed. A root `Makefile` gives every backend the same targets
+(`make go`, `go-build`, `go-test`, `go-install`, `perl-test`,
+`perl-install`, ...), each calling that language's own tools; it copies
+nothing itself. A root `INSTALL.md` covers what all backends share and
+points to each backend's own `INSTALL.md`.** The root holds nothing
+language-specific beyond the `Makefile` and `INSTALL.md`.
+
+Rules out: committed copies, hard links or git hooks to keep copies in
+step, and a `go.mod` at the repository root. `go install ...@latest` does
+not work, since the copies are not in git; the Go install guide says so.
+Revisit if `go install` from the module proxy is wanted.
+
 ## 2026-11-18 — A repository's own git settings reach its diffs
 
 **Ruling (owner): git calls ignore global and system config, but a

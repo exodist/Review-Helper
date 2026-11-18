@@ -238,9 +238,9 @@ subtest listen => sub {
     if (can_bind('127.0.0.2')) {
         my ($exit, $out, $err) = cli($dir, 'serve', '--listen', '127.0.0.2', $file);
         my ($port) = $out =~ m{:(\d+)/};
-        is([$exit, $out, $err],                [0, "http://127.0.0.2:$port/\n", ''], 'a loopback address: its URL, no token and no warning');
-        is($socket->sockhost,                  '127.0.0.2',                          'bound there');
-        is($code->(Sys::Hostname::hostname()), 403,                                  'and only loopback names are accepted');
+        is([$exit, $out, $err],           [0, "http://127.0.0.2:$port/\n", ''], 'a loopback address: its URL, no token and no warning');
+        is($socket->sockhost,             '127.0.0.2',                          'bound there');
+        is($code->('review.example.com'), 403,                                  'and only loopback names are accepted');
     }
 
     my ($exit, $out, $err) = cli($dir, 'serve', '--listen', '0.0.0.0', '--allow-host', 'alias.example.com', '--open', $file);

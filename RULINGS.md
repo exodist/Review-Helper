@@ -21,6 +21,20 @@ see `~/projects/Agents/AGENTS.md` under "What earns a place in `RULINGS.md`".
 
 ---
 
+## 2026-11-18 — A repository's own git settings reach its diffs
+
+**Ruling (owner): git calls ignore global and system config, but a
+repository's own `.git/config` still applies. A setting is pinned with a
+flag on the call that needs it only when it breaks Review-Helper's
+output.** Rules out overriding repository config centrally for every git
+call.
+
+Evidence: of the diff settings tried, only `log.showSignature` broke
+anything (fixed with `--no-show-signature`). `diff.suppressBlankEmpty` is
+already handled by the parser, `core.quotePath` changes only header lines
+the parser skips, and `diff.relative` and `diff.orderFile` have no
+visible effect. The rest give people the diffs they configured.
+
 ## 2026-11-18 — No NJH smoker guard; native Windows perl is unsupported
 
 **Ruling (owner): `Makefile.PL` stops only on a perl that cannot fork

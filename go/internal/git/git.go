@@ -68,14 +68,14 @@ type Rev struct {
 // a directory.
 func Find(path string) (*Repo, error) {
 	if path == "" {
-		return nil, errors.New("No path given")
+		return nil, errors.New("no path given")
 	}
 	dir := path
 	if st, err := os.Stat(path); err != nil || !st.IsDir() {
 		dir = filepath.Dir(path)
 	}
 	if st, err := os.Stat(dir); err != nil || !st.IsDir() {
-		return nil, fmt.Errorf("No such directory: %s", dir)
+		return nil, fmt.Errorf("no such directory: %s", dir)
 	}
 	dir, err := filepath.EvalSymlinks(dir)
 	if err != nil {
@@ -90,7 +90,7 @@ func Find(path string) (*Repo, error) {
 	}
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
 	if len(lines) < 3 {
-		return nil, fmt.Errorf("Not inside a git worktree: %s", dir)
+		return nil, fmt.Errorf("not inside a git worktree: %s", dir)
 	}
 	gitDir, commonDir := lines[0], lines[1]
 	var root string
@@ -118,21 +118,18 @@ func (r *Repo) SharedStateDir() string { return filepath.Join(r.CommonDir, "revi
 // directories, strictly.
 func (r *Repo) IsInternalPath(path string) bool {
 	for _, dir := range []string{r.GitDir, r.CommonDir} {
-		if within(dir, path) {
+		if Within(dir, path) {
 			return true
 		}
 	}
 	return false
 }
 
-// within reports whether path is strictly inside dir.
-func within(dir, path string) bool {
+// Within reports whether path is strictly inside dir.
+func Within(dir, path string) bool {
 	rel, err := filepath.Rel(filepath.Clean(dir), filepath.Clean(path))
 	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
-
-// Within reports whether path is strictly inside dir.
-func Within(dir, path string) bool { return within(dir, path) }
 
 // Resolve returns the full id of the commit name names.
 func (r *Repo) Resolve(name string) (string, error) {
@@ -141,7 +138,7 @@ func (r *Repo) Resolve(name string) (string, error) {
 		return "", err
 	}
 	if code == 1 {
-		return "", fmt.Errorf("Unknown revision '%s'", name)
+		return "", fmt.Errorf("unknown revision '%s'", name)
 	}
 	if code != 0 {
 		return "", fmt.Errorf("git rev-parse failed: %s", errText)
@@ -288,7 +285,7 @@ func (r *Repo) RangeChanges(from, to string, paths []string) ([]*Change, error) 
 	for _, c := range changes {
 		n, ok := counts[c.Path]
 		if !ok {
-			return nil, fmt.Errorf("No line counts for '%s'", c.Path)
+			return nil, fmt.Errorf("no line counts for '%s'", c.Path)
 		}
 		c.Added, c.Removed, c.Binary = n.Added, n.Removed, n.Binary
 	}
@@ -493,7 +490,7 @@ func gitIn(dir string, args ...string) (string, error) {
 		return "", err
 	}
 	if code != 0 {
-		return "", fmt.Errorf("Not inside a git worktree: %s\n%s", dir, errText)
+		return "", fmt.Errorf("not inside a git worktree: %s\n%s", dir, errText)
 	}
 	return string(out), nil
 }
@@ -513,7 +510,7 @@ func rootFromGitDir(gitDir, commonDir string) (string, error) {
 		} else {
 			data, err := os.ReadFile(filepath.Join(gitDir, "gitdir"))
 			if err != nil {
-				return "", fmt.Errorf("Cannot find the worktree of %s: %v", gitDir, err)
+				return "", fmt.Errorf("cannot find the worktree of %s: %v", gitDir, err)
 			}
 			dotGit := strings.SplitN(string(data), "\n", 2)[0]
 			// Relative when the worktree was added with --relative-paths.
@@ -537,7 +534,7 @@ func rootFromGitDir(gitDir, commonDir string) (string, error) {
 		check, code = strings.TrimRight(string(out), "\n"), c
 	}
 	if code != 0 || check != gitDir {
-		return "", fmt.Errorf("Cannot find the worktree of %s", gitDir)
+		return "", fmt.Errorf("cannot find the worktree of %s", gitDir)
 	}
 	return root, nil
 }
@@ -552,16 +549,16 @@ func parseRaw(raw []byte) ([]*Change, error) {
 		head := tokens[i]
 		i++
 		if !strings.HasPrefix(head, ":") {
-			return nil, fmt.Errorf("Unexpected diff line '%s'", head)
+			return nil, fmt.Errorf("unexpected diff line '%s'", head)
 		}
 		f := strings.Split(head[1:], " ")
 		if len(f) < 5 || f[4] == "" {
-			return nil, fmt.Errorf("Unexpected diff line '%s'", head)
+			return nil, fmt.Errorf("unexpected diff line '%s'", head)
 		}
 		code := f[4][0]
 		status, ok := statusMap[code]
 		if !ok {
-			return nil, fmt.Errorf("Unexpected diff status '%c'", code)
+			return nil, fmt.Errorf("unexpected diff status '%c'", code)
 		}
 		c := &Change{Status: status, Submodule: f[0] == "160000" || f[1] == "160000"}
 		if code == 'R' || code == 'C' {
@@ -569,7 +566,7 @@ func parseRaw(raw []byte) ([]*Change, error) {
 			i++
 		}
 		if i >= len(tokens) {
-			return nil, fmt.Errorf("Truncated diff output")
+			return nil, fmt.Errorf("truncated diff output")
 		}
 		c.Path = tokens[i]
 		i++

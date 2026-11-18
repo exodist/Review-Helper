@@ -281,7 +281,7 @@ subtest resolution => sub {
     is(scalar(@{$mrepo->parents($merge)}),                       2,  'a merge has two parents');
     is($mrepo->resolution_changes($mrepo->parents($merge)->[0]), [], 'a commit that is not a merge has none');
     SKIP: {
-        skip 'remerge diffs need git 2.47', 3 unless $mrepo->_has_remerge_diff;
+        skip 'remerge diffs need git 2.36', 3 unless $mrepo->_has_remerge_diff;
         is($mrepo->resolution_changes($merge),              [{path => 'f.txt', old_path => undef, status => 'M', submodule => 0}], 'the resolved file');
         is($mrepo->resolution_changes($merge, ['nothing']), [],                                                                    'path specs limit it');
         like($mrepo->resolution_diff($merge, 'f.txt'), qr/^-<<<<<<< .*^\+B-both$/ms, 'the diff runs from the conflict to the resolution');

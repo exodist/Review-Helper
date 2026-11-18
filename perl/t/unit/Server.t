@@ -604,7 +604,7 @@ subtest resolution => sub {
     my $none  = {Main => F(), Side => F(), 'Merge side' => F(), Other => F(), 'Merge other' => F()};
 
     SKIP: {
-        skip 'remerge diffs need git 2.47', 10 unless $mrepo->_has_remerge_diff;
+        skip 'remerge diffs need git 2.36', 10 unless $mrepo->_has_remerge_diff;
 
         my $calls  = 0;
         my $count  = mock 'Review::Helper::VCS::Git' => (around => [resolution_changes => sub ($orig, @args) { $calls++; $orig->(@args) }]);
@@ -645,10 +645,10 @@ subtest resolution => sub {
     is({map { ($_->{subject} => $_->{resolution}) } @{json_decode($ares->content)->{commits}}}, {'Absent merge' => F()}, 'with no resolution');
     is($mget->("/api/resolution/$id_absent")->code,                                             404,                     'and no remerge diff');
 
-    my $old   = mock 'Review::Helper::VCS::Git' => (override => [_git => sub ($self, @args) { $args[0] eq 'version' ? "git version 2.46.2\n" : die "unexpected git @args" }]);
+    my $old   = mock 'Review::Helper::VCS::Git' => (override => [_git => sub ($self, @args) { $args[0] eq 'version' ? "git version 2.35.1\n" : die "unexpected git @args" }]);
     my $fresh = Plack::Test->create(Review::Helper::Server->new(db_path => $mfile)->to_app);
     my $after = $fresh->request(GET "$HOST/api/review?iteration=1");
-    is($after->code,                                                                             200,   'git before 2.47 loads the review');
+    is($after->code,                                                                             200,   'git before 2.36 loads the review');
     is({map { ($_->{subject} => $_->{resolution}) } @{json_decode($after->content)->{commits}}}, $none, 'and reports no resolutions');
 };
 

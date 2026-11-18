@@ -139,11 +139,11 @@ sub range_diff($self, $from, $to, $path, $old_path = undef) {
 
 sub resolution_changes($self, $sha, $paths = undef) {
     return [] unless $self->_has_remerge_diff && @{$self->parents($sha)} > 1;
-    return $self->_parse_raw($self->_git(qw/diff-tree --remerge-diff --no-commit-id -r -z -M --raw --end-of-options/, $sha, '--', @{$paths // []}));
+    return $self->_parse_raw($self->_git(qw/show --no-abbrev --format= --remerge-diff -r -z -M --raw --end-of-options/, $sha, '--', @{$paths // []}));
 }
 
 sub resolution_diff($self, $sha, $path, $old_path = undef) {
-    return $self->_git(qw/diff-tree --remerge-diff --no-commit-id -r -p/, @DIFF_OPTIONS, '--end-of-options', $sha, '--', $self->_file_pathspecs($path, $old_path));
+    return $self->_git(qw/show --format= --remerge-diff -r -p/, @DIFF_OPTIONS, '--end-of-options', $sha, '--', $self->_file_pathspecs($path, $old_path));
 }
 
 sub parents($self, $sha) {
@@ -212,11 +212,12 @@ sub _file_pathspecs($self, $path, $old_path = undef) {
     return map { ":(literal)$_" } defined($old_path) ? ($old_path, $path) : ($path);
 }
 
-# diff-tree runs --remerge-diff from git 2.47; earlier ones die with a BUG.
+# git 2.36 added --remerge-diff. show, not diff-tree: diff-tree dies with a BUG
+# on it before 2.47.
 sub _has_remerge_diff($self) {
     return $self->{_has_remerge_diff} //= do {
         my ($major, $minor) = $self->_git('version') =~ m/(\d+)\.(\d+)/;
-        ($major // 0) > 2 || (($major // 0) == 2 && $minor >= 47) ? 1 : 0;
+        ($major // 0) > 2 || (($major // 0) == 2 && $minor >= 36) ? 1 : 0;
     };
 }
 
@@ -390,7 +391,7 @@ the diffs and C<file> return raw bytes.
 
 The format specification gives the git meaning of each of the role's terms.
 C<user> (C<user.name> and C<user.email>) is the one git run that reads the
-user's own configuration; a git older than 2.47 shows no merge resolutions.
+user's own configuration; a git older than 2.36 shows no merge resolutions.
 
 =head1 SYNOPSIS
 

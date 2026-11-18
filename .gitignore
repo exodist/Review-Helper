@@ -19,6 +19,8 @@ Build
 Build.bat
 MYMETA.*
 Makefile
+# The root Makefile drives every backend's own tools.
+!/Makefile
 _build
 _build/
 blib/

@@ -77,6 +77,7 @@ behavior out of it, and change it only deliberately (it is versioned).
 | `conformance/` | Checks any backend runs: the CLI checks and the page drive | `conformance/README.md` |
 | `bin/` | `review-helper`, the POSIX `sh` dispatcher that runs `review-helper-<impl>` from `PATH` | — |
 | `perl/` | The Perl backend, the first implementation; it builds the CPAN distribution `Review-Helper` | `perl/AGENTS.md` |
+| `go/` | The Go backend: one binary embedding `ux/`, `skills/` and `standards/` | `go/AGENTS.md` |
 
 A backend implements `standards/` and ships `ux/`, `skills/` and
 `standards/` in its distribution; the Perl one does it through symlinks in

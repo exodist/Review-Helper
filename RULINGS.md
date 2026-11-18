@@ -135,7 +135,9 @@ gitignored directory under `go/`; the copies are never committed, and
 `go install ...@latest` does not work (its install guide says so). A root
 `Makefile` gives every backend the same targets (`make go`, `go-build`,
 `go-test`, `go-install`, `perl-test`, `perl-install`, ...), each calling that
-language's own tools; it copies nothing itself. A root `INSTALL.md` covers
+language's own tools; it copies none of the shared files itself, but an
+install target installs the `review-helper` command beside its backend, as
+`dzil install` does for Perl. A root `INSTALL.md` covers
 what all backends share and points to each backend's `INSTALL.md`. The root
 holds nothing language-specific beyond the `Makefile` and `INSTALL.md`.
 

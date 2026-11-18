@@ -31,7 +31,9 @@ var commands map[string]command
 
 func init() {
 	commands = map[string]command{
+		"build":     runBuild,
 		"close":     runClose,
+		"iterate":   runIterate,
 		"list":      runList,
 		"note":      runNote,
 		"prune":     runPrune,

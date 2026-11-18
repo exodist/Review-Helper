@@ -28,7 +28,7 @@ skip_all "the conformance page drive is not here (run from perl/ in a checkout)"
 
 my $node   = find_bin('node')                            or skip_all "node is not installed";
 my $chrome = find_bin(qw/google-chrome-stable chromium/) or skip_all "neither google-chrome-stable nor chromium is installed";
-skip_all "the fixture builder needs node 22.13 or later (node:sqlite)" if system($node, '--input-type=module', '-e', "await import('node:sqlite')");
+skip_all "the fixture builder needs node 22.13 or later (node:sqlite)" if system(qq{"$node" --no-warnings --input-type=module -e "await import('node:sqlite')" >} . File::Spec->devnull . ' 2>&1');
 
 my ($pid, $server);
 

@@ -45,10 +45,10 @@ configuration with `GIT_CONFIG_GLOBAL` and create repositories with
   `chromium`, and outside a checkout. It builds each conformance fixture
   with this backend (`conformance/README.md`, "Fixtures") and serves it with
   `scripts/review-helper-perl serve`; see that section to run the drive by
-  hand (the checks add feedback and close the review). The drive fails itself after `REVIEW_HELPER_E2E_TIMEOUT` seconds
-  (default 180); the test notes how long it took. Its whole-page wheel check
-  runs only when `AUTHOR_TESTING` is set and not 0 (`agent-test-lock` sets
-  it).
+  hand (the checks add feedback and close the review). The drive fails
+  itself after `REVIEW_HELPER_E2E_TIMEOUT` seconds (default 180); the test
+  notes how long it took. Its whole-page wheel check runs only when
+  `AUTHOR_TESTING` is set and not 0 (`agent-test-lock` sets it).
 - `t/integration/cli-conformance.t` runs the CLI conformance checks
   (`conformance/cli/`) against this checkout's `review-helper-perl`, through
   the dispatcher; it skips without `node`, and outside a checkout.

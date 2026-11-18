@@ -6,8 +6,9 @@
 // adjusts some the API wrote (clearing reviewers, setting a section,
 // removing a seen mark) where the fixture needs what no route makes. Prints
 // the review file's path; it does not serve it. With --topics, the review is
-// a squashed one split into two topics. This file is the authoritative description of
-// the fixtures' content; conformance/README.md, "Fixtures", says how to use it.
+// a squashed one split into two topics. This file is the authoritative
+// description of the fixtures' content; conformance/README.md, "Fixtures",
+// says how to use it.
 //
 // Usage: node conformance/fixtures.mjs [--topics] DIR
 import fs from 'node:fs';

@@ -16,6 +16,13 @@ volume and trivia.
 The tool is new and still finding that balance. Expect it to try a few
 things along the way; this is the place for those trials.
 
+**Review Helper is a language-agnostic standard first.** The review file,
+its schema, the HTTP API the page uses and the commands the agent skills
+run are all specified in `standards/`, so a backend in any language can
+serve the same page and run the same skills, checked by `conformance/`.
+The Perl code in `perl/` is the reference implementation, not the
+definition: see [Standards](#standards) and [Backends](#backends).
+
 ## Key ideas
 
 - **A journal.** While it works, the agent notes what a reviewer will need to
@@ -114,11 +121,41 @@ Coming soon:
 - A central server, for organizations that want reviews kept in one place
   instead of on one-off servers
 
+## Standards
+
+The page, the review file and the skills do not depend on any one language.
+What a backend must do is written down in `standards/`:
+
+| File | Defines |
+|---|---|
+| `FORMAT.md` | The review file: its data, the journal, the fill sheet agents write, exports, and every validation rule |
+| `review.sql` | The review file's SQLite schema, exactly |
+| `API.md` | The HTTP API between the review page and its server |
+| `CLI.md` | The `review-helper` commands the skills rely on, and how `review-helper` picks a backend |
+
+Each standard has a required core. Implementations may add their own
+extensions; names starting `x-<impl>-` (commands) or `/api/x-<impl>/` (routes)
+are never used by the standard, so extensions there cannot collide with it.
+
+## Backends
+
+`perl/` is the reference implementation and covers the whole standard: it
+builds and iterates reviews from git, validates and stores what agents write,
+serves the page, exports and imports reviews, and keeps reviewed commits from
+being garbage collected. It is a Perl 5.36 Plack app with SQLite review files,
+shipped as the CPAN distribution `Review-Helper`.
+
+Other backends can follow and be checked against `conformance/`.
+`review-helper` picks the backend named by `REVIEW_HELPER_IMPL`, or else the
+first one installed on your `PATH`; `review-helper --which` lists those it
+finds and marks the one it uses.
+
 ## Install
 
-You need Perl 5.36 or later, git (2.36 or later to see how a merge resolved
-its conflicts), and a web browser. It needs a perl that can fork: Cygwin's
-perl works on Windows, native Windows perl does not.
+Perl is the only implementation so far, so installing means installing the
+Perl reference backend. You need Perl 5.36 or later, git (2.36 or later to
+see how a merge resolved its conflicts), and a web browser. The perl must be
+able to fork: Cygwin's perl works on Windows, native Windows perl does not.
 
 From CPAN: `cpanm Review::Helper` installs `review-helper` and the Perl
 backend. Then link the nine skills into your agent's skills directory
@@ -166,35 +203,6 @@ The user manual has the details: `perldoc Review::Helper::Manual`, or
 | `conformance/` | Tests any backend can run to check it meets the standards |
 | `bin/` | `review-helper`, one command that runs whichever backend is installed |
 | `docs/` | Images for this README |
-
-## Standards
-
-The page, the review file and the skills do not depend on any one language.
-What a backend must do is written down in `standards/`:
-
-| File | Defines |
-|---|---|
-| `FORMAT.md` | The review file: its data, the journal, the fill sheet agents write, exports, and every validation rule |
-| `review.sql` | The review file's SQLite schema, exactly |
-| `API.md` | The HTTP API between the review page and its server |
-| `CLI.md` | The `review-helper` commands the skills rely on, and how `review-helper` picks a backend |
-
-Each standard has a required core. Implementations may add their own
-extensions; names starting `x-<impl>-` (commands) or `/api/x-<impl>/` (routes)
-are never used by the standard, so extensions there cannot collide with it.
-
-## Backends
-
-`perl/` is the reference backend, and it implements the whole standard: it
-builds and iterates reviews from git, validates and stores what agents write,
-serves the page, exports and imports reviews, and keeps reviewed commits from
-being garbage collected. It is a Perl 5.36 Plack app with SQLite review files,
-shipped as a CPAN distribution (not yet released).
-
-Other backends can follow and be checked against `conformance/`.
-`review-helper` picks the backend named by `REVIEW_HELPER_IMPL`, or else the
-first one installed on your `PATH`; `review-helper --which` lists those it
-finds and marks the one it uses.
 
 ## Good to know
 

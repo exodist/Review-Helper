@@ -21,24 +21,6 @@ see `~/projects/Agents/AGENTS.md` under "What earns a place in `RULINGS.md`".
 
 ---
 
-## 2026-11-18 — Backends that cannot follow symlinks copy the shared files at build time
-
-**Ruling (owner): amends "The repository is a standard, a page and skills;
-Perl is one backend" (2026-11-11). Go's `go:embed` refuses symlinks, so the
-Go backend gets `ux/`, `skills/` and `standards/` as copies a Go generator
-(`go generate`) makes in a gitignored directory under `go/`; the copies are
-never committed. A root `Makefile` gives every backend the same targets
-(`make go`, `go-build`, `go-test`, `go-install`, `perl-test`,
-`perl-install`, ...), each calling that language's own tools; it copies
-nothing itself. A root `INSTALL.md` covers what all backends share and
-points to each backend's own `INSTALL.md`.** The root holds nothing
-language-specific beyond the `Makefile` and `INSTALL.md`.
-
-Rules out: committed copies, hard links or git hooks to keep copies in
-step, and a `go.mod` at the repository root. `go install ...@latest` does
-not work, since the copies are not in git; the Go install guide says so.
-Revisit if `go install` from the module proxy is wanted.
-
 ## 2026-11-18 — A repository's own git settings reach its diffs
 
 **Ruling (owner): git calls ignore global and system config, but a
@@ -146,6 +128,17 @@ from `perl/`; `perl/share/` holds committed symlinks to `ux/`, `skills/` and
 `standards/`, and `[GatherDir]` with `follow_symlinks = 1` ships the real
 files, so a checkout runs with no extra lookup logic.
 
+Owner, 2026-11-18: a backend whose tools cannot follow symlinks copies the
+shared files at build time instead. Go's `go:embed` refuses symlinks, so a
+Go generator (`go generate`) copies `ux/`, `skills/` and `standards/` into a
+gitignored directory under `go/`; the copies are never committed, and
+`go install ...@latest` does not work (its install guide says so). A root
+`Makefile` gives every backend the same targets (`make go`, `go-build`,
+`go-test`, `go-install`, `perl-test`, `perl-install`, ...), each calling that
+language's own tools; it copies nothing itself. A root `INSTALL.md` covers
+what all backends share and points to each backend's `INSTALL.md`. The root
+holds nothing language-specific beyond the `Makefile` and `INSTALL.md`.
+
 The standard has a required core and room to extend: `CLI.md` lists the
 commands, options and output the skills rely on, `API.md` the routes and
 JSON the page relies on, with access as a layer (a token is one kind) and
@@ -156,10 +149,12 @@ else an implementation adds may collide with a later version. The standard
 is versioned as a whole; `review-helper version` and `standard_version` in
 `GET /api/review` report it.
 
-Rules out: copying the shared files into each backend, and lookup logic to
-find them from a checkout. Revisit if a platform the distribution must
-install on cannot hold symlinks in a checkout, or the standard's parts need
-versions of their own.
+Rules out: committed copies of the shared files in a backend, hard links
+or hooks to keep copies in step, lookup logic to find them from a checkout,
+and a `go.mod` at the repository root. Revisit if a platform the
+distribution must install on cannot hold symlinks in a checkout, if
+`go install` from the module proxy is wanted, or if the standard's parts
+need versions of their own.
 
 ## 2026-11-11 — One `review-helper` command dispatches to implementations
 

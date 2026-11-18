@@ -138,11 +138,11 @@ sub range_diff($self, $from, $to, $path, $old_path = undef) {
 
 sub resolution_changes($self, $sha, $paths = undef) {
     return [] unless $self->_has_remerge_diff && @{$self->parents($sha)} > 1;
-    return $self->_parse_raw($self->_git(qw/show --no-abbrev --format= --remerge-diff -r -z -M --raw --end-of-options/, $sha, '--', @{$paths // []}));
+    return $self->_parse_raw($self->_git(qw/show --no-show-signature --no-abbrev --format= --remerge-diff -r -z -M --raw --end-of-options/, $sha, '--', @{$paths // []}));
 }
 
 sub resolution_diff($self, $sha, $path, $old_path = undef) {
-    return $self->_git(qw/show --format= --remerge-diff -r -p/, @DIFF_OPTIONS, '--end-of-options', $sha, '--', $self->_file_pathspecs($path, $old_path));
+    return $self->_git(qw/show --no-show-signature --format= --remerge-diff -r -p/, @DIFF_OPTIONS, '--end-of-options', $sha, '--', $self->_file_pathspecs($path, $old_path));
 }
 
 sub parents($self, $sha) {

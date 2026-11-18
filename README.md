@@ -118,7 +118,8 @@ Coming soon:
 
 Not released yet; run it from a checkout. You need Perl 5.36 or later, git
 (2.36 or later to see how a merge resolved its conflicts), and a web
-browser.
+browser. It needs a perl that can fork: Cygwin's perl works on Windows,
+native Windows perl does not.
 
 1. Install [Dist::Zilla](https://metacpan.org/dist/Dist-Zilla)
    (`cpanm Dist::Zilla`), then the Perl dependencies:

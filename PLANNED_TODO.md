@@ -3,15 +3,13 @@
 Features and changes the owner has asked for but deferred. Each entry says
 when it is wanted. Remove an entry once it is built; git keeps the history.
 
-# Before the first release
-
 ## Keep the standard from blocking a hosted variant
 
 Owner, 2026-11-11: the schema (`standards/review.sql`) in SQL that PostgreSQL
 and MySQL also accept. Access as a layer and content fetches that need no
 checkout are already in `standards/API.md`.
 
-## Clean up before release
+## Clean up
 
 - review-publish: before posting line comments, compare the pull request's
   current head with the `head` that `feedback --publish` prints, and stop
@@ -24,10 +22,11 @@ checkout are already in `standards/API.md`.
 
 ## Agent interaction in the browser
 
-Owner, 2026-11-11: wanted before the first release. In the agent-hosted
-setup this is the listening agent below: the agent that launched the review
-answers questions asked on the page. Talking to an AI from the page with no
-local agent (an AI API account) belongs to the centrally hosted variant.
+Owner, 2026-11-11: wanted before the first release (it missed 0.001). In
+the agent-hosted setup this is the listening agent below: the agent that
+launched the review answers questions asked on the page. Talking to an AI
+from the page with no local agent (an AI API account) belongs to the
+centrally hosted variant.
 
 ### Discuss with a listening agent
 
@@ -54,8 +53,6 @@ and shown while fresh, or both; recommended: the heartbeat, with a thread
 note when it goes stale). The rest: prompt-injection limits, one listening
 agent per review, when the loop stops.
 
-# After the first release
-
 ## A centrally hosted variant
 
 Owner, 2026-11-11: a company or group deploys the app on a web server with
@@ -68,12 +65,21 @@ hosted setups.
 
 ## More backends
 
-Python, Node or Go implementations of the standard, once someone wants one,
-each checked by `conformance/`. Before the first: a way to build the page
-drive's fixtures without the Perl backend serving them
-(`conformance/README.md`, "Fixtures"). A single self-contained executable or
-a container image may answer "I do not want to install Perl" more cheaply and
-can come first. A `.cmd` dispatcher if Windows users appear.
+Owner, 2026-11-18: add Go and Node backends, each a full implementation of
+the standard checked by `conformance/`. Before the first: a way to build the
+page drive's fixtures without the Perl backend serving them
+(`conformance/README.md`, "Fixtures").
+
+- **Go** (`review-helper-go`): one static binary with the page, skills and
+  standards embedded; runs git without forking, so native Windows works;
+  SQLite without a C compiler (`modernc.org/sqlite`). Its distance from Perl
+  tests the standard's language neutrality hardest.
+- **Node** (`review-helper-node`): runs where agent tools already have node,
+  via `npx`; SQLite and HTTP built in (`node:sqlite`, node 22.5 or later), so
+  it can ship with no dependencies, and can share code with the page.
+
+A Python backend once someone wants one. A `.cmd` dispatcher if native
+Windows users appear.
 
 ## Extension points in the review file format
 

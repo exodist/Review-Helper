@@ -32,6 +32,9 @@ var commands map[string]command
 func init() {
 	commands = map[string]command{
 		"close":     runClose,
+		"export":    runExport,
+		"feedback":  runFeedback,
+		"import":    runImport,
 		"list":      runList,
 		"note":      runNote,
 		"prune":     runPrune,

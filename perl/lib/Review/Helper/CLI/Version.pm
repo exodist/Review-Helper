@@ -1,7 +1,7 @@
 package Review::Helper::CLI::Version;
 use v5.36;
 
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 
 use Review::Helper;
 

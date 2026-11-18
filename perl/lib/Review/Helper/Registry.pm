@@ -1,7 +1,7 @@
 package Review::Helper::Registry;
 use v5.36;
 
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 
 use Carp qw/croak/;
 use Encode qw/decode encode FB_CROAK LEAVE_SRC/;

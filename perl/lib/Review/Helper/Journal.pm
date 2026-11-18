@@ -1,7 +1,7 @@
 package Review::Helper::Journal;
 use v5.36;
 
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 
 use Carp qw/croak/;
 use Fcntl qw/:flock O_RDWR O_CREAT/;

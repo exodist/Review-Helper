@@ -1,7 +1,7 @@
 package Review::Helper::Util;
 use v5.36;
 
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 
 use Exporter 'import';
 our @EXPORT_OK = qw/json_encode json_decode gen_uuid now share_dir/;

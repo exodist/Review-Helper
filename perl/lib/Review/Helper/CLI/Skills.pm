@@ -1,7 +1,7 @@
 package Review::Helper::CLI::Skills;
 use v5.36;
 
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 
 use File::Spec;
 use Review::Helper::Util qw/share_dir/;

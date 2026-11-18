@@ -1,7 +1,7 @@
 package Review::Helper::CLI::Serve;
 use v5.36;
 
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 
 use Capture::Tiny qw/capture_stdout/;
 use File::Spec();

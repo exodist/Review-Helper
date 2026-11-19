@@ -568,7 +568,8 @@ sub carry_flags($self, $commit_id, $commit, $from = $commit->{carry_from}) {
 
 # The flags of a previous commit no new commit pairs with (rewritten, so
 # its change id changed, or dropped) are not lost: each goes pending, without
-# seen marks, onto the last new commit that changes its path, its lines moved
+# seen marks, following its file to the new path the VCS finds it renamed to
+# by the head, onto the last new commit that changes its path, its lines moved
 # through the diff between the two commits where the diff keeps any, else on
 # the whole file. With no new commit changing its path, or no path, it goes
 # on the iteration's last commit (whole-file), where the sheet reports it as
@@ -585,11 +586,15 @@ sub carry_unpaired_flags($self, $number, $commits) {
     my $insert = $dbh->prepare('INSERT INTO flag (commit_id, pending, ' . join(', ' => @cols) . ') VALUES (?, 1' . (', ?' x @cols) . ')');
     for my $from (@lost) {
         for my $flag (@{$dbh->selectall_arrayref('SELECT * FROM flag WHERE commit_id = ? ORDER BY id', {Slice => {}}, $from->{id})}) {
+            # A file the VCS finds renamed by the head is followed to its new
+            # path first.
+            my $from_path = $flag->{path};
+            $flag->{path} = $self->renamed_to($from, $new->[0], $from_path) // $from_path if defined $from_path;
             my $path = $flag->{path};
             my ($to) = defined($path) ? grep { $dbh->selectrow_array('SELECT 1 FROM file_change WHERE commit_id = ? AND path = ?', undef, $_->{id}, $path) } @$new : ();
             my @lines;
             if ($to && defined $flag->{line_start}) {
-                my $moves = $self->line_moves($from, $to, $path);
+                my $moves = $self->line_moves($from, $to, $from_path, $path);
                 @lines = map_lines($moves, @$flag{qw/line_start line_end/})        if $moves;
                 @lines = $self->kept_span($moves, @$flag{qw/line_start line_end/}) if $moves && !@lines;
             }
@@ -618,9 +623,10 @@ sub renamed_to($self, $old, $new, $path) {
 
 # The diff hunks from a path in one commit to the same path (or $to_path,
 # where it was renamed) in another, so line numbers in one can be moved to
-# the other; none when they read the same. A file both deleted is compared
-# as it was before them. Undef when the path exists on one side only, or is
-# a binary file that changed.
+# the other; none when they read the same, as a file in neither commit nor
+# their parents does. A file both deleted is compared as it was before them,
+# so undef when either commit has no parent; undef too when the path exists
+# on one side only, or is a binary file that changed.
 sub line_moves($self, $old, $new, $path, $to_path = $path) {
     return [] if $old->{revision} eq $new->{revision};
 
@@ -630,6 +636,10 @@ sub line_moves($self, $old, $new, $path, $to_path = $path) {
     return undef unless defined($from) && defined($to);
 
     my ($before, $after) = ($repo->file_id($from, $path), $repo->file_id($to, $to_path));
+
+    # In neither commit nor their parents (a kept flag on a file outside the
+    # change), the file reads the same.
+    return []    unless defined($before) || defined($after);
     return undef unless defined($before) && defined($after);
     return [] if $before eq $after;
     my $diff = parse_diff($self->decode_text($repo->range_diff($from, $to, $to_path, $to_path eq $path ? undef : $path)));
@@ -996,8 +1006,9 @@ settled, with its marks.
 
 In an iteration that is not squashed, copy the flags of each previous
 commit no commit in C<\@commits> carries from (rewritten, so its change id
-changed, or dropped), pending and without seen marks: onto the last commit of
-iteration C<$number> that changes the flag's path, its lines moved by the
+changed, or dropped), pending and without seen marks, following the file to
+the path the VCS finds it renamed to by the iteration's head: onto the last
+commit of iteration C<$number> that changes the flag's path, its lines moved by the
 diff between the two commits' files where it keeps any, else on the whole
 file; with no commit changing the path, or no path, onto the iteration's
 last commit, flagging the whole file.
@@ -1051,8 +1062,9 @@ holding that path.
 The parsed diff hunks from C<$path> in one commit to C<$to_path> (default
 C<$path>; the file's new path when it was renamed) in the other (each a
 hashref with C<revision> and C<parent>): empty when the file reads the same,
-undef when it exists in only one. A file deleted in both is compared
-before them.
+as a file in neither commit nor their parents does; undef when it exists in
+only one. A file deleted in both is compared before them, so undef when
+either commit has no parent.
 
 =item $file = $builder->default_file($rev, $revision)
 

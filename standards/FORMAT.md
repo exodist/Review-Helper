@@ -383,7 +383,8 @@ takes the new path and is compared there; in a squashed iteration, a copied flag
 `path` goes to the entry holding that path. Its `flag_seen` rows (every reviewer's, keeping `at`) are copied too
 when the code it covers is unchanged: no flagged line changed and no line was
 added between them, or, flagging a whole file, the file reads the same in
-both commits, or it has no `path`. Otherwise the code under it changed: the
+both commits (as a file in neither commit nor their parents, both having
+one, does), or it has no `path`. Otherwise the code under it changed: the
 copy is `pending` with no seen marks, on the lines from the first to the
 last flagged line the diff kept, or on the whole file when it kept none, the
 file exists in only one of the commits, or it is a binary file that changed.
@@ -395,8 +396,10 @@ had there. A flag kept on a file already outside the change carries as any
 other.
 In an iteration that is not squashed, the flags of a previous commit that no
 new commit pairs with (its change was rewritten, so its `change_id` changed,
-or the commit was dropped) are copied too, `pending` with no seen marks: to
-the last commit (by `position`) that changes the flag's `path`, its lines
+or the commit was dropped) are copied too, `pending` with no seen marks,
+taking the new path first when the VCS finds the flag's file renamed between
+its old commit and the new head: to the last commit (by `position`) that
+changes the flag's `path`, its lines
 moved by the diff between the file in the old commit and in that one as
 above (the whole file when the diff keeps none of them); with no commit
 changing its `path`, or no `path`, to the iteration's last commit, a flag
@@ -517,7 +520,7 @@ A `flag` target names the flag by its note id: a `flag` item's
 the `note:` prefix.
 
 For `diff`, `path` and `section` are optional: omit both for the commit's
-diff, `section` for the file's. `topic` is allowed on `commit` and `diff`
+diff, `section` for the file's; a `section` needs a `path`. `topic` is allowed on `commit` and `diff`
 targets only, and needed there, with no `path`, when the commit is a
 squashed iteration's split into topics (it may be given, and must exist,
 otherwise); a `path` names the topic holding it. A `view` of a path in no
@@ -589,11 +592,14 @@ The only way agents write review text. `sheet` emits it; the agent fills
 - `about` is read-only context. It never contains code; agents read code
 through the VCS.
 - `rev` is a hash of the data the item describes. `fill` rejects an item whose
-`rev` no longer matches.
+`rev` no longer matches. It is the backend's own: a sheet is filled by the
+implementation that made it.
 - `fields` hold the item's current stored values, null where unset (feedback
 `status` and every `flag` field always start null). A field returned with a value is written, even
 when the value is the one the sheet gave.
 - An item whose fields are all null is skipped. Empty strings are rejected.
+A text field also takes a JSON number, stored as text; how it is written
+(`1.5` or `1.50`) is the implementation's.
 - An item counts as done once its required fields are set; other fields may stay
 null, meaning "not applicable". Required, per type:
     - `summary`: `what`, `why`, `how`; `note` is optional.
@@ -807,8 +813,9 @@ file's sections (see [Sections](#sections)). Section feedback and section reques
 on the file stay on the new touched section with its `name` and
 `package`; with none (gone or untouched) they become `file` feedback or
 requests that keep `section_name` and `section_package`, naming the
-section they were given on. Nothing else about them changes. An open split
-request on the file is marked done.
+section they were given on. Nothing else about them changes. The open split
+request the item's `about.request` shows is marked done; another open on the
+file comes in the next sheet, so the agent reads every note.
 
 `fill` validates everything before writing anything, and rejects with a
 message naming the item: unknown ids, wrong types, stale `rev`, ranges

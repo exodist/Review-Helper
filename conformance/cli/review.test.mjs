@@ -113,12 +113,16 @@ test('fill rejects a bad sheet whole, naming the item', { timeout: TIMEOUT }, ()
     const good = sheet.items.find(i => i.id === 'summary:1');
     const order = sheet.items.find(i => i.type === 'order');
     const split = sheet.items.find(i => i.type === 'split' && i.about.path === 'six.txt');
+    const guide = sheet.items.find(i => i.type === 'guide');
     const bad = [
         ['an unknown id', { id: 'commit:999999', type: 'commit', rev: 'x', about: {}, fields: { what: 'a', why: 'b', how: 'c' } }, /commit:999999/],
         ['a stale rev', { ...good, rev: 'not-the-rev', fields: fillFields(good) }, /summary:1/],
         ['an empty string', { ...good, fields: { what: '', why: 'b', how: 'c' } }, /summary:1/],
         ['an order missing a path', { ...order, fields: { paths: order.about.paths.slice(1) } }, new RegExp(order.id)],
         ['a section outside the file', { ...split, fields: { sections: [{ name: 'all', package: null, lines: [[1, 60]], first_line: 'one' }] } }, new RegExp(split.id)],
+        ['a diff step naming a section but no path', {
+            ...guide, fields: { steps: [{ target: { type: 'diff', commit: r.head, section: { name: 'all', package: null } }, highlight: [], commentary: 'Here.' }] },
+        }, new RegExp(guide.id)],
     ];
     for (const [what, item, names] of bad) {
         const items = what === 'a stale rev' ? [item] : [{ ...good, fields: fillFields(good) }, item];
@@ -188,6 +192,56 @@ test('a rewritten commit keeps its flags, pending on the commit that replaced it
     const third = json(r.dir, ['sheet', '--all', r.file]).items.filter(i => i.type === 'flag');
     assert.deepEqual(third.map(f => f.about.note).sort(), flags.map(f => f.about.note).sort());
     assert.ok(third.every(f => f.about.pending === false && f.about.commit === next));
+});
+
+test("a rewritten commit's flags follow a file it renamed", { timeout: TIMEOUT }, () => {
+    const r = reviewed();
+    assert.equal(fillAll(r, json(r.dir, ['sheet', r.file])).status, 0);
+    // Amend the flagged commit to add the file under another name.
+    git(r.dir, 'mv', 'six.txt', 'seven.txt');
+    git(r.dir, 'commit', '-q', '--amend', '--no-edit');
+    const next = git(r.dir, 'rev-parse', 'HEAD');
+    assert.equal(rhOk(r.dir, ['iterate', r.file]), '2\n');
+
+    const flags = json(r.dir, ['sheet', r.file]).items.filter(i => i.type === 'flag');
+    assert.equal(flags.length, 3, 'every flag of the rewritten commit is asked about');
+    for (const f of flags) {
+        assert.equal(f.about.pending, true);
+        assert.equal(f.about.rewritten, true);
+        assert.equal(f.about.commit, next, 'on the commit that replaced it');
+        assert.equal(f.about.path, 'seven.txt', 'on the file under its new name');
+        assert.deepEqual(f.about.lines, f.about.previous.lines, 'on the same lines');
+    }
+});
+
+test('a flag kept on a file outside the change stays settled through a rebase', { timeout: TIMEOUT }, () => {
+    const dir = makeRepo();
+    const base = git(dir, 'rev-parse', 'HEAD');
+    const head = commit(dir, 'Add six lines', { 'six.txt': SIX });
+    const gone = commit(dir, 'Add a file', { 'gone.txt': 'gone\n' });
+    const note = rhOk(dir, ['note', '--flag', 'yellow', '--path', 'gone.txt', '--sentence', 'About the file.']).trim();
+    const file = rhOk(dir, ['build', '--base', base]).trim();
+    assert.equal(fill(dir, file, filled(json(dir, ['sheet', file]), item => item.type === 'note'
+        ? { commit: gone, path: 'gone.txt', lines: null } : fillFields(item))).status, 0);
+
+    // Drop the commit adding the file: its flag goes pending, its file out
+    // of the change; the agent keeps it.
+    git(dir, 'reset', '-q', '--hard', head);
+    assert.equal(rhOk(dir, ['iterate', file]), '2\n');
+    const pending = json(dir, ['sheet', file]);
+    const flag = pending.items.find(i => i.type === 'flag' && i.about.note === note);
+    assert.equal(flag.about.left_change, true);
+    assert.equal(fill(dir, file, { ...pending, items: [{ ...flag, fields: { decision: 'keep', color: null, reason: null } }] }).status, 0);
+
+    // Rebase onto a new base: every commit gets a new revision.
+    git(dir, 'checkout', '-q', '-b', 'newbase', base);
+    const newBase = commit(dir, 'Something else', { 'other.txt': 'other\n' });
+    git(dir, 'checkout', '-q', 'main');
+    git(dir, 'rebase', '-q', newBase);
+    assert.equal(rhOk(dir, ['iterate', file, '--base', newBase]), '3\n');
+    const again = json(dir, ['sheet', '--all', file]).items.find(i => i.type === 'flag' && i.about.note === note);
+    assert.equal(again.about.pending, false, 'not asked about again');
+    assert.equal(again.about.path, 'gone.txt');
 });
 
 test('a squashed review asks about flags whose code changed: keep, recolor, retire', { timeout: TIMEOUT }, () => {

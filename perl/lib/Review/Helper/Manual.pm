@@ -803,7 +803,8 @@ use one every time. C<CMD> is split on spaces and run without a shell.
 C<--listen> listens on another address, such as C<0.0.0.0> for every
 interface, and C<--allow-host> accepts another name for this machine (see
 L</Reviewing from another machine>; C<REVIEW_HELPER_LISTEN> and
-C<REVIEW_HELPER_ALLOW_HOSTS> set them every time). C<--open> also opens your
+C<REVIEW_HELPER_ALLOW_HOSTS> set them every time, the names adding to those
+of C<--allow-host>). C<--open> also opens your
 browser on Linux and macOS, on the loopback URL when there is one.
 C<--reviewer> names who is reviewing (see L</Who is reviewing>).
 

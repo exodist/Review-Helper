@@ -91,3 +91,19 @@ test('a review file alone as the first argument serves it', { timeout: TIMEOUT }
     }
     finally { await server.stop() }
 });
+
+test('reviewed content is served sandboxed, its type not sniffed', { timeout: TIMEOUT }, async () => {
+    const dir = makeRepo();
+    const base = git(dir, 'rev-parse', 'HEAD');
+    const head = commit(dir, 'Add a file', { 'a.txt': 'a\n' });
+    const file = rhOk(dir, ['build', '--base', base]).trim();
+    const server = await serve(dir, ['serve', file]);
+    try {
+        const res = await fetch(new URL(`api/content/${head}/a.txt`, server.url));
+        assert.equal(res.status, 200);
+        assert.equal(await res.text(), 'a\n');
+        assert.equal(res.headers.get('content-security-policy'), 'sandbox');
+        assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+    }
+    finally { await server.stop() }
+});

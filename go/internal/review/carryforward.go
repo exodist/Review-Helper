@@ -438,9 +438,10 @@ func (b *builder) renamedTo(from, to *CommitEntry, path string) (string, error) 
 
 // moveDiff is the diff from path in one commit to toPath in another, so
 // line numbers in one can be moved to the other; no hunks when they read the
-// same. A file in neither commit (deleted by both) is compared as it was
-// before them. ok is false when the file is on one side only, or is a binary
-// file that changed.
+// same, as a file in neither commit nor their parents does. A file in
+// neither commit (deleted by both) is compared as it was before them, so ok
+// is false when either commit has no parent; it is false too when the file
+// is on one side only, or is a binary file that changed.
 func (b *builder) moveDiff(from, to *CommitEntry, path, toPath string) ([]*Hunk, bool, error) {
 	if from.Revision == to.Revision {
 		return nil, true, nil
@@ -465,6 +466,11 @@ func (b *builder) moveDiff(from, to *CommitEntry, path, toPath string) ([]*Hunk,
 		if after, err = b.repo.FileID(toRev, toPath); err != nil {
 			return nil, false, err
 		}
+	}
+	// In neither commit nor their parents (a kept flag on a file outside
+	// the change), the file reads the same.
+	if before == "" && after == "" {
+		return nil, true, nil
 	}
 	if before == "" || after == "" {
 		return nil, false, nil
@@ -492,7 +498,8 @@ func (b *builder) moveDiff(from, to *CommitEntry, path, toPath string) ([]*Hunk,
 
 // carryUnpairedFlags copies, pending with no seen marks, the flags of every
 // previous entry no new entry paired with (its commit was rewritten or
-// dropped): each to the last new entry that changes its path, its lines
+// dropped), following its file to the path the VCS finds it renamed to by
+// the head: each to the last new entry that changes its path, its lines
 // moved where the diff keeps any; with none changing its path, or no path,
 // to the last entry (by position), on the whole file.
 func (b *builder) carryUnpairedFlags(tx *sql.Tx, number int64, entries []*newEntry) error {
@@ -517,11 +524,24 @@ func (b *builder) carryUnpairedFlags(tx *sql.Tx, number int64, entries []*newEnt
 			return err
 		}
 		for _, f := range flags {
+			// A file the VCS finds renamed by the head is followed to its
+			// new path first.
+			fromPath := ""
+			if f.Path != nil {
+				fromPath = *f.Path
+				renamed, err := b.renamedTo(from, &newest.CommitEntry, fromPath)
+				if err != nil {
+					return err
+				}
+				if renamed != "" {
+					f.Path = &renamed
+				}
+			}
 			to := lastChanging(entries, f.Path)
 			if to == nil {
 				to, f.LineStart, f.LineEnd = newest, nil, nil
 			} else if f.LineStart != nil {
-				hunks, ok, err := b.moveDiff(from, &to.CommitEntry, *f.Path, *f.Path)
+				hunks, ok, err := b.moveDiff(from, &to.CommitEntry, fromPath, *f.Path)
 				if err != nil {
 					return err
 				}

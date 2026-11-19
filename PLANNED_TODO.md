@@ -20,6 +20,24 @@ checkout are already in `standards/API.md`.
   warning twice, the `repo` attribute name holding a VCS object, and whether
   to bring back a test of the spec against the schema.
 
+## Conformance for every backend's shared rules
+
+Owner, 2026-11-19 (option A): on a branch of its own, move into
+`conformance/` the checks of behavior every backend must have that only the
+Go backend's unit tests cover today, then drop those unit tests:
+
+- the publish list's prefixes and line-fit rules (renames, merged-in
+  entries, a squashed iteration's old side);
+- the export layout (keys sorted, one row per line);
+- the access layer: host check spellings, static path safety, POST
+  `Content-Type` and `Origin` checks;
+- merge nesting and pairing commits across iterations (by change id,
+  first with first; by revision only when not squashed);
+- fill's writes: a topics rewrite moving or renaming commit feedback and
+  requests, a retired flag's feedback becoming file or commit feedback, a
+  re-split moving section feedback and requests, debates turning `done`,
+  addressed feedback's `resolved_in`, and guide refusals.
+
 ## Agent interaction in the browser
 
 Owner, 2026-11-11: wanted before the first release (it missed 0.001). In

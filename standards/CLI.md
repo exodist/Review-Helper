@@ -204,7 +204,7 @@ these names and meanings.
       the local access layer ([API.md](API.md), "The local access layer");
       `REVIEW_HELPER_LISTEN` sets it every time;
     - `--allow-host NAME` (repeatable) accepts another host name for this
-      machine; `REVIEW_HELPER_ALLOW_HOSTS` (comma-separated) sets them every
+      machine; `REVIEW_HELPER_ALLOW_HOSTS` (comma-separated) adds to them every
       time;
     - `--open` opens a browser on the page;
     - `--reviewer NAME` names who is reviewing.

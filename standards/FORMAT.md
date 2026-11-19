@@ -592,11 +592,14 @@ The only way agents write review text. `sheet` emits it; the agent fills
 - `about` is read-only context. It never contains code; agents read code
 through the VCS.
 - `rev` is a hash of the data the item describes. `fill` rejects an item whose
-`rev` no longer matches.
+`rev` no longer matches. It is the backend's own: a sheet is filled by the
+implementation that made it.
 - `fields` hold the item's current stored values, null where unset (feedback
 `status` and every `flag` field always start null). A field returned with a value is written, even
 when the value is the one the sheet gave.
 - An item whose fields are all null is skipped. Empty strings are rejected.
+A text field also takes a JSON number, stored as text; how it is written
+(`1.5` or `1.50`) is the implementation's.
 - An item counts as done once its required fields are set; other fields may stay
 null, meaning "not applicable". Required, per type:
     - `summary`: `what`, `why`, `how`; `note` is optional.
@@ -810,8 +813,9 @@ file's sections (see [Sections](#sections)). Section feedback and section reques
 on the file stay on the new touched section with its `name` and
 `package`; with none (gone or untouched) they become `file` feedback or
 requests that keep `section_name` and `section_package`, naming the
-section they were given on. Nothing else about them changes. An open split
-request on the file is marked done.
+section they were given on. Nothing else about them changes. The open split
+request the item's `about.request` shows is marked done; another open on the
+file comes in the next sheet, so the agent reads every note.
 
 `fill` validates everything before writing anything, and rejects with a
 message naming the item: unknown ids, wrong types, stale `rev`, ranges

@@ -70,7 +70,8 @@ The layer a backend serving a review on the reviewer's own machine uses.
 - **No token.** The server listens on loopback only and admits every
   request.
 - **A token.** The server listens beyond loopback and prints a URL ending in
-  `?token=TOKEN`. A loopback client is admitted without it. Any other client
+  `?token=TOKEN`. A loopback client is admitted without it, and its requests
+  skip token handling, a `?token=` in them included. Any other client
   needs it: a request carrying `?token=TOKEN` is answered with 303 to `/`
   (whatever its path and query), setting the cookie `rh_token_PORT=TOKEN`
   (`HttpOnly`, `SameSite=Lax`, `Path=/`, where PORT is the server's port, so

@@ -92,6 +92,9 @@ and its sheet item reports the file as having left the change, as the squashed
 rule does). The sheet's flag item asks keep, recolor or retire as usual and
 says the commit was rewritten (`about.rewritten`); seen marks go, as for any
 pending flag.** Feedback on the flag keeps working through its note id.
+Owner, 2026-11-19: a renamed file is followed first: when the VCS finds the
+flag's file renamed between its old commit and the new head, the rule above
+applies to the new path.
 
 Rules out: dropping such flags silently (the behaviour before), and
 reporting them only on standard error. Evidence: the CLI conformance work

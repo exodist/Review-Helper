@@ -511,7 +511,10 @@ so (`about.left_change`); the agent keeps, recolors or retires it (usually
 retires). A kept flag stays on its path, shown on its topic or commit card.
 It goes pending only in the iteration its file leaves the change; once
 kept, later iterations carry it settled with its seen marks (re-pending it
-every iteration lost the marks).
+every iteration lost the marks). Owner, 2026-11-19: that holds after a
+rebase too: a whole-file flag on a file in neither the old nor the new
+commit, nor their parents, counts as on a file that reads the same, so it
+carries settled with its marks.
 
 Rules out: carrying such a flag silently as settled, or dropping it.
 

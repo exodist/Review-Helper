@@ -106,6 +106,16 @@ and skill recipes that only re-taught agents what they already do.
 
 ---
 
+### Commit messages may name the standards
+
+Departs from `~/projects/Agents/DOCUMENTATION.md`, "Commit messages", which
+bars naming any `.md` file. A commit message here may name a file of the
+standard (`standards/FORMAT.md`, `CLI.md`, `API.md`, `review.sql`) and the
+section it changes or follows; agent documents stay unnamed.
+
+Reason: owner, 2026-11-19. The standards are the project's subject, not
+agent context, and the history has always named them.
+
 ## Prior rulings
 
 Recorded in `RULINGS.md`, not here. This file holds declarations and

@@ -60,6 +60,21 @@ test('import makes an open review in another copy, and merges when it is there',
     assert.equal(rhOk(clone, ['import', exportFile]).trim(), file, 'a second import merges into the same file');
 });
 
+test('import ignores tables it does not know and x_ tables and columns', { timeout: TIMEOUT }, () => {
+    const r = review();
+    const clone = cloneOf(r.dir);
+    const x = JSON.parse(rhOk(r.dir, ['export', r.file]));
+    // A later version's table, in a shape this version does not read, an
+    // extension's table, and an extension's column on a known table.
+    x.tables.later_table = { schema: 2 };
+    x.tables.x_conformance = { columns: ['note'], rows: [['an extension row']] };
+    x.tables.review.columns.push('x_conformance_flag');
+    for (const row of x.tables.review.rows) row.push(1);
+    const res = rh(clone, ['import', '-'], JSON.stringify(x));
+    assert.equal(res.status, 0, res.stderr);
+    assert.equal(json(clone, ['sheet', '--all', res.stdout.trim()]).review, r.id, 'the review arrives');
+});
+
 test('import names each iteration whose head is missing here', { timeout: TIMEOUT }, () => {
     const r = review();
     const clone = cloneOf(r.dir);

@@ -152,45 +152,9 @@ finds and marks the one it uses.
 
 ## Install
 
-Perl is the only implementation so far, so installing means installing the
-Perl reference backend. You need Perl 5.36 or later, git (2.36 or later to
-see how a merge resolved its conflicts), and a web browser. The perl must be
-able to fork: Cygwin's perl works on Windows, native Windows perl does not.
-
-From CPAN: `cpanm Review::Helper` installs `review-helper` and the Perl
-backend. Then link the nine skills into your agent's skills directory
-(`~/.claude/skills/` for Claude Code, `~/.agents/skills/` for Codex), one
-line each, or ask your agent to do it:
-
-```
-ln -s "$(review-helper skills path)/review-build" ~/.claude/skills/
-```
-
-From a checkout:
-
-1. Install [Dist::Zilla](https://metacpan.org/dist/Dist-Zilla)
-   (`cpanm Dist::Zilla`), then the Perl dependencies:
-
-   ```
-   cd perl
-   dzil authordeps --missing | cpanm
-   dzil listdeps --missing | cpanm
-   ```
-
-2. Put the Perl backend on your path. `perl/scripts/` holds both
-   `review-helper` and the Perl backend it runs. Add this to your shell
-   profile, with the checkout's absolute path:
-
-   ```
-   export PATH="/path/to/Review-Helper/perl/scripts:$PATH"
-   export PERL5LIB="/path/to/Review-Helper/perl/lib:$PERL5LIB"
-   ```
-
-   `review-helper --which` should now name the Perl backend.
-3. Link the skills as above.
-
-The user manual has the details: `perldoc Review::Helper::Manual`, or
-`perldoc perl/lib/Review/Helper/Manual.pm` from a checkout.
+[`INSTALL.md`](INSTALL.md): pick a backend (Perl, the reference
+implementation, or Go, a single binary), install it, and link the agent
+skills. Every backend needs git and a web browser.
 
 ## Repository layout
 
@@ -199,7 +163,8 @@ The user manual has the details: `perldoc Review::Helper::Manual`, or
 | `standards/` | The open standards: the review file format, its database schema, the HTTP API between page and server, and the command-line interface |
 | `ux/` | The review page (JavaScript, CSS, HTML), usable with any backend |
 | `skills/` | Agent skills: keep a journal, build a review, act on feedback, review a pull request, and more |
-| `perl/` | The Perl backend, the first reference implementation |
+| `perl/` | The Perl backend, the reference implementation |
+| `go/` | The Go backend, a single binary |
 | `conformance/` | Tests any backend can run to check it meets the standards |
 | `bin/` | `review-helper`, one command that runs whichever backend is installed |
 | `docs/` | Images for this README |
@@ -230,7 +195,8 @@ The user manual has the details: `perldoc Review::Helper::Manual`, or
 - `RULINGS.md`: the owner's decisions and why.
 - `PLANNED_TODO.md`: planned work.
 - Tests: `perl/AGENTS.md`, "Testing" (they need git 2.32 or later, node 18
-  or later, and Chrome or Chromium for the page checks);
+  or later, and for the page checks node 22.13 or later and Chrome or
+  Chromium);
   `conformance/README.md` for checking any backend.
 
 ## License

@@ -63,8 +63,25 @@ git repository:
 
 The server must name its reviewer `Tess Tester <tess@example.com>`.
 
-Today the fixtures are built, and served, only by the test setup of the
-first backend; that backend's own instructions say how to run it, and its
-setup is the authoritative description of the fixtures' content. Another
-backend can run the drive against the same fixtures once they can be written
-without being served.
+`fixtures.mjs` builds either one, and is the authoritative description of
+their content:
+
+    node conformance/fixtures.mjs [--topics] DIR
+
+It makes a git repository in `DIR` (new or empty), builds and fills the
+review with `bin/review-helper` (so `REVIEW_HELPER_IMPL` picks the backend,
+as for the CLI checks), adds feedback through the HTTP API from short-lived
+servers, then edits the review file with `node:sqlite`: a few rows the
+format allows but no command or route writes, and adjustments to some the
+API wrote (reviewer-less feedback, a seen mark). It prints the review file's
+path. It does not serve the review: serve it with any backend, then drive
+the page.
+
+    node conformance/fixtures.mjs DIR
+    review-helper serve FILE --reviewer 'Tess Tester <tess@example.com>'
+    node conformance/page-drive.mjs URL
+
+The builder needs node 22.13 or later, for `node:sqlite`. A fixture built
+by one backend can be served by another, which checks that review files are
+interchangeable. The page shows the repository's path in its header, so
+build in a short directory, as a temporary one is, for the layout checks.

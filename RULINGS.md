@@ -92,6 +92,9 @@ and its sheet item reports the file as having left the change, as the squashed
 rule does). The sheet's flag item asks keep, recolor or retire as usual and
 says the commit was rewritten (`about.rewritten`); seen marks go, as for any
 pending flag.** Feedback on the flag keeps working through its note id.
+Owner, 2026-11-19: a renamed file is followed first: when the VCS finds the
+flag's file renamed between its old commit and the new head, the rule above
+applies to the new path.
 
 Rules out: dropping such flags silently (the behaviour before), and
 reporting them only on standard error. Evidence: the CLI conformance work
@@ -128,6 +131,19 @@ from `perl/`; `perl/share/` holds committed symlinks to `ux/`, `skills/` and
 `standards/`, and `[GatherDir]` with `follow_symlinks = 1` ships the real
 files, so a checkout runs with no extra lookup logic.
 
+Owner, 2026-11-18: a backend whose tools cannot follow symlinks copies the
+shared files at build time instead. Go's `go:embed` refuses symlinks, so a
+Go generator (`go generate`) copies `ux/`, `skills/` and `standards/` into a
+gitignored directory under `go/`; the copies are never committed, and
+`go install ...@latest` does not work (its install guide says so). A root
+`Makefile` gives every backend the same targets (`make go`, `go-build`,
+`go-test`, `go-install`, `perl-test`, `perl-install`, ...), each calling that
+language's own tools; it copies none of the shared files itself, but an
+install target installs the `review-helper` command beside its backend, as
+`dzil install` does for Perl. A root `INSTALL.md` covers
+what all backends share and points to each backend's `INSTALL.md`. The root
+holds nothing language-specific beyond the `Makefile` and `INSTALL.md`.
+
 The standard has a required core and room to extend: `CLI.md` lists the
 commands, options and output the skills rely on, `API.md` the routes and
 JSON the page relies on, with access as a layer (a token is one kind) and
@@ -138,10 +154,12 @@ else an implementation adds may collide with a later version. The standard
 is versioned as a whole; `review-helper version` and `standard_version` in
 `GET /api/review` report it.
 
-Rules out: copying the shared files into each backend, and lookup logic to
-find them from a checkout. Revisit if a platform the distribution must
-install on cannot hold symlinks in a checkout, or the standard's parts need
-versions of their own.
+Rules out: committed copies of the shared files in a backend, hard links
+or hooks to keep copies in step, lookup logic to find them from a checkout,
+and a `go.mod` at the repository root. Revisit if a platform the
+distribution must install on cannot hold symlinks in a checkout, if
+`go install` from the module proxy is wanted, or if the standard's parts
+need versions of their own.
 
 ## 2026-11-11 — One `review-helper` command dispatches to implementations
 
@@ -496,7 +514,10 @@ so (`about.left_change`); the agent keeps, recolors or retires it (usually
 retires). A kept flag stays on its path, shown on its topic or commit card.
 It goes pending only in the iteration its file leaves the change; once
 kept, later iterations carry it settled with its seen marks (re-pending it
-every iteration lost the marks).
+every iteration lost the marks). Owner, 2026-11-19: that holds after a
+rebase too: a whole-file flag on a file in neither the old nor the new
+commit, nor their parents, counts as on a file that reads the same, so it
+carries settled with its marks.
 
 Rules out: carrying such a flag silently as settled, or dropping it.
 

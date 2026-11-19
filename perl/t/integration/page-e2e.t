@@ -2,7 +2,10 @@
 use v5.36;
 use Test2::V0;
 
+use Cwd qw/abs_path/;
+use File::Basename qw/dirname/;
 use File::Spec;
+use File::Temp qw/tempdir/;
 use Time::HiRes qw/time/;
 
 # The driver fails itself after this many seconds, so the TAP names the
@@ -25,6 +28,7 @@ skip_all "the conformance page drive is not here (run from perl/ in a checkout)"
 
 my $node   = find_bin('node')                            or skip_all "node is not installed";
 my $chrome = find_bin(qw/google-chrome-stable chromium/) or skip_all "neither google-chrome-stable nor chromium is installed";
+skip_all "the fixture builder needs node 22.13 or later (node:sqlite)" if system(qq{"$node" --no-warnings --input-type=module -e "await import('node:sqlite')" >} . File::Spec->devnull . ' 2>&1');
 
 my ($pid, $server);
 
@@ -38,10 +42,27 @@ sub stop_server() {
 
 END { stop_server() }
 
-# Serve the setup's review (with @mode, its other fixture) and drive the
-# page against it.
+my $fixtures = File::Spec->catfile(File::Spec->updir, 'conformance', 'fixtures.mjs');
+my @inc      = map { abs_path($_) } grep { !ref && -d } @INC;
+
+# Build the conformance fixture (with @mode, its other one) with this
+# backend, serve it, and drive the page against it.
 sub drive(@mode) {
-    $pid = open($server, '-|', $^X, (map { "-I$_" } grep { !ref } @INC), 't/scripts/page-e2e-setup.pl', @mode) // die "Cannot run the setup script: $!";
+    my $dir  = tempdir(CLEANUP => 1);
+    my $file = do {
+        # The builder runs review-helper, which runs this checkout's backend
+        # with this perl.
+        local $ENV{PATH}               = join ':' => abs_path('scripts'), dirname($^X), $ENV{PATH};
+        local $ENV{PERL5LIB}           = join ':' => @inc;
+        local $ENV{REVIEW_HELPER_IMPL} = 'perl';
+        my $out = qx{"$node" "$fixtures" @mode "$dir/repo"};
+        is($?, 0, 'the fixture builds') or bail_out("fixture build failed:\n$out");
+        (split /\n/ => $out)[-1];
+    };
+
+    # A developer's own port-lease setting must not pick this server's port.
+    delete local $ENV{REVIEW_HELPER_PORT_COMMAND};
+    $pid = open($server, '-|', $^X, (map { "-I$_" } @inc), 'scripts/review-helper-perl', 'serve', $file, '--reviewer', 'Tess Tester <tess@example.com>') // die "Cannot run the server: $!";
     my $server_pid = $pid;
 
     my $url = eval {
@@ -52,7 +73,7 @@ sub drive(@mode) {
         $line;
     };
     chomp($url) if defined $url;
-    like($url, qr{^http://127\.0\.0\.1:\d+/$}, 'setup serves the review') or bail_out("no server: " . ($@ || 'no URL printed'));
+    like($url, qr{^http://127\.0\.0\.1:\d+/$}, 'the server serves the review') or bail_out("no server: " . ($@ || 'no URL printed'));
 
     my $out = '';
     {

@@ -66,37 +66,17 @@ hosted setups.
 ## More backends
 
 Owner, 2026-11-18: add Go and Node backends, each a full implementation of
-the standard checked by `conformance/`.
+the standard checked by `conformance/` (its fixture builder runs with any
+backend). Go is built (`go/`); Node is next.
 
-First, a fixture builder any backend can run (owner, 2026-11-18). Today the
-page drive's fixtures come from the Perl test setup
-(`perl/t/scripts/page-e2e-setup.pl`), which fills through Perl internals,
-writes edge-case rows with SQL and serves in the same process
-(`conformance/README.md`, "Fixtures"). Replace it with a node script in
-`conformance/`, like the CLI checks:
-
-- builds the repository with plain git, and the review with only
-  `review-helper` (`build`, `sheet`, `fill`); `REVIEW_HELPER_IMPL` picks the
-  backend, Perl by default;
-- posts feedback through the HTTP API, as `conformance/cli/` does;
-- writes the edge-case rows the sheet refuses but the format allows straight
-  into the review file with `node:sqlite`, against `standards/review.sql`;
-- writes the repository and review file and stops; any backend serves them.
-
-The fixtures' content description moves to `conformance/`, and the Perl
-end-to-end test runs the builder. Building with one backend and serving with
-another then checks the review files are interchangeable.
-
-- **Go** (`review-helper-go`): one static binary with the page, skills and
-  standards embedded; runs git without forking, so native Windows works;
-  SQLite without a C compiler (`modernc.org/sqlite`). Its distance from Perl
-  tests the standard's language neutrality hardest.
 - **Node** (`review-helper-node`): runs where agent tools already have node,
   via `npx`; SQLite and HTTP built in (`node:sqlite`, node 22.5 or later), so
   it can ship with no dependencies, and can share code with the page.
 
 A Python backend once someone wants one. A `.cmd` dispatcher if native
-Windows users appear.
+Windows users appear, with, for the Go backend, a Windows file lock in
+place of `flock` and `.exe` names accepted: until then Go supports Windows
+only through WSL.
 
 ## Extension points in the review file format
 

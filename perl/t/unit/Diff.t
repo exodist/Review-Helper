@@ -68,6 +68,15 @@ subtest parse_diff => sub {
     like(dies { parse_diff("@@ -1 +1 @@\n?x\n") }, qr/Malformed diff/, "bad hunk line");
 };
 
+subtest trailing_blank_context => sub {
+    # Under diff.suppressBlankEmpty git prints a blank context line as an
+    # empty line, which at the end of the text must still be read.
+    my $diff  = parse_diff("@@ -1,4 +1,4 @@\n a\n b\n-c\n+C\n\n");
+    my $lines = $diff->{hunks}[0]{lines};
+    is(scalar(@$lines), 5,                                             'every line of the hunk');
+    is($lines->[-1],    {type => ' ', text => '', old => 4, new => 4}, 'the blank last line is context');
+};
+
 subtest count_lines => sub {
     my $diff = parse_diff($DIFF);
     is(count_lines($diff->{hunks}), {changed => 2, removed => 1, added => 2}, "runs counted by the min rule");

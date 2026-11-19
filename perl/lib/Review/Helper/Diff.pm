@@ -12,7 +12,10 @@ our @EXPORT_OK = qw/parse_diff count_lines attribute line_owners map_lines move_
 sub parse_diff($text) {
     croak "parse_diff() needs diff text" unless defined $text;
 
-    my @lines  = split /\n/, $text;
+    # Only the newline ending the text: an empty last line is a context line
+    # whose space diff.suppressBlankEmpty stripped.
+    my @lines = split /\n/, $text, -1;
+    pop @lines if @lines && $lines[-1] eq '';
     my $binary = 0;
     my @hunks;
 

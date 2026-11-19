@@ -1,5 +1,7 @@
 {{$NEXT}}
 
+    - A diff no longer drops a blank last context line when the repository sets diff.suppressBlankEmpty.
+
 0.002     2026-11-18 14:03:19-08:00 America/Los_Angeles
 
     - A section's diff no longer splits where only blank lines separate its parts, so documentation next to its code shows in one diff.

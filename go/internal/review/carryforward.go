@@ -466,6 +466,11 @@ func (b *builder) moveDiff(from, to *CommitEntry, path, toPath string) ([]*Hunk,
 			return nil, false, err
 		}
 	}
+	// In neither commit nor their parents (a kept flag on a file outside
+	// the change), the file reads the same.
+	if before == "" && after == "" {
+		return nil, true, nil
+	}
 	if before == "" || after == "" {
 		return nil, false, nil
 	}
@@ -517,11 +522,24 @@ func (b *builder) carryUnpairedFlags(tx *sql.Tx, number int64, entries []*newEnt
 			return err
 		}
 		for _, f := range flags {
+			// A file the VCS finds renamed by the head is followed to its
+			// new path first.
+			fromPath := ""
+			if f.Path != nil {
+				fromPath = *f.Path
+				renamed, err := b.renamedTo(from, &newest.CommitEntry, fromPath)
+				if err != nil {
+					return err
+				}
+				if renamed != "" {
+					f.Path = &renamed
+				}
+			}
 			to := lastChanging(entries, f.Path)
 			if to == nil {
 				to, f.LineStart, f.LineEnd = newest, nil, nil
 			} else if f.LineStart != nil {
-				hunks, ok, err := b.moveDiff(from, &to.CommitEntry, *f.Path, *f.Path)
+				hunks, ok, err := b.moveDiff(from, &to.CommitEntry, fromPath, *f.Path)
 				if err != nil {
 					return err
 				}

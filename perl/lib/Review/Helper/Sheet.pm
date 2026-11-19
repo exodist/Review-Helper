@@ -854,6 +854,7 @@ sub check_target($self, $ctx, $plan, $target) {
 
     my ($commit, $error) = $self->find_commit($ctx, $target->{commit}, $target->{topic}, $target->{path});
     return (undef, "'commit': $error")                                                           if $error;
+    return ($commit, "'section' needs a 'path'")                                                 if $target->{type} eq 'diff' && defined($target->{section}) && !defined($target->{path});
     return ($commit)                                                                             if $target->{type} eq 'commit' || ($target->{type} eq 'diff' && !defined($target->{path}));
     return ($commit, $self->check_view($ctx, $commit, 'new', $target->{path}, $target->{lines})) if $target->{type} eq 'view';
 

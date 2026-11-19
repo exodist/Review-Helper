@@ -142,6 +142,8 @@ func (v *validator) checkTarget(raw json.RawMessage) (*sheetCommit, bool, []stri
 		return nil, false, []string{"'commit': " + p}
 	}
 	switch {
+	case typ == "diff" && !isNull(t["section"]) && isNull(t["path"]):
+		return e, false, []string{"'section' needs a 'path'"}
 	case typ == "commit" || (typ == "diff" && isNull(t["path"])):
 		return e, false, nil
 	case typ == "view":

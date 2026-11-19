@@ -87,7 +87,16 @@ test('a review file alone as the first argument serves it', { timeout: TIMEOUT }
     try {
         const res = await fetch(new URL('api/review', server.url));
         assert.equal(res.status, 200);
-        assert.equal((await res.json()).review.id, id);
+        const review = await res.json();
+        assert.equal(review.review.id, id);
+
+        // Reviewed content is untrusted: sandboxed, its type not sniffed.
+        const head = review.commits.at(-1).revision;
+        const content = await fetch(new URL(`api/content/${head}/a.txt`, server.url));
+        assert.equal(content.status, 200);
+        assert.equal(await content.text(), 'a\n');
+        assert.match(content.headers.get('content-security-policy') ?? '', /\bsandbox\b/);
+        assert.equal(content.headers.get('x-content-type-options'), 'nosniff');
     }
     finally { await server.stop() }
 });

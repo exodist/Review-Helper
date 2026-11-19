@@ -87,16 +87,23 @@ test('a review file alone as the first argument serves it', { timeout: TIMEOUT }
     try {
         const res = await fetch(new URL('api/review', server.url));
         assert.equal(res.status, 200);
-        const review = await res.json();
-        assert.equal(review.review.id, id);
+        assert.equal((await res.json()).review.id, id);
+    }
+    finally { await server.stop() }
+});
 
-        // Reviewed content is untrusted: sandboxed, its type not sniffed.
-        const head = review.commits.at(-1).revision;
-        const content = await fetch(new URL(`api/content/${head}/a.txt`, server.url));
-        assert.equal(content.status, 200);
-        assert.equal(await content.text(), 'a\n');
-        assert.match(content.headers.get('content-security-policy') ?? '', /\bsandbox\b/);
-        assert.equal(content.headers.get('x-content-type-options'), 'nosniff');
+test('reviewed content is served sandboxed, its type not sniffed', { timeout: TIMEOUT }, async () => {
+    const dir = makeRepo();
+    const base = git(dir, 'rev-parse', 'HEAD');
+    const head = commit(dir, 'Add a file', { 'a.txt': 'a\n' });
+    const file = rhOk(dir, ['build', '--base', base]).trim();
+    const server = await serve(dir, ['serve', file]);
+    try {
+        const res = await fetch(new URL(`api/content/${head}/a.txt`, server.url));
+        assert.equal(res.status, 200);
+        assert.equal(await res.text(), 'a\n');
+        assert.equal(res.headers.get('content-security-policy'), 'sandbox');
+        assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
     }
     finally { await server.stop() }
 });

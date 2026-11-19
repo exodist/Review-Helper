@@ -206,6 +206,7 @@ test("a rewritten commit's flags follow a file it renamed", { timeout: TIMEOUT }
     const flags = json(r.dir, ['sheet', r.file]).items.filter(i => i.type === 'flag');
     assert.equal(flags.length, 3, 'every flag of the rewritten commit is asked about');
     for (const f of flags) {
+        assert.equal(f.about.pending, true);
         assert.equal(f.about.rewritten, true);
         assert.equal(f.about.commit, next, 'on the commit that replaced it');
         assert.equal(f.about.path, 'seven.txt', 'on the file under its new name');

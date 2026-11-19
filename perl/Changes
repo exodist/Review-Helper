@@ -1,7 +1,7 @@
 {{$NEXT}}
 
     - A flag kept on a file outside the change stays settled when the branch is rebased.
-    - A rewritten commit's flags follow a file it renamed.
+    - A rewritten commit's flags follow their file when it is renamed.
     - A guide diff step naming a section but no path is rejected.
     - A diff no longer drops a blank last context line when the repository sets diff.suppressBlankEmpty.
 

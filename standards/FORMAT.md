@@ -383,8 +383,8 @@ takes the new path and is compared there; in a squashed iteration, a copied flag
 `path` goes to the entry holding that path. Its `flag_seen` rows (every reviewer's, keeping `at`) are copied too
 when the code it covers is unchanged: no flagged line changed and no line was
 added between them, or, flagging a whole file, the file reads the same in
-both commits (as a file in neither commit nor their parents does), or it
-has no `path`. Otherwise the code under it changed: the
+both commits (as a file in neither commit nor their parents, both having
+one, does), or it has no `path`. Otherwise the code under it changed: the
 copy is `pending` with no seen marks, on the lines from the first to the
 last flagged line the diff kept, or on the whole file when it kept none, the
 file exists in only one of the commits, or it is a binary file that changed.

@@ -624,9 +624,9 @@ sub renamed_to($self, $old, $new, $path) {
 # The diff hunks from a path in one commit to the same path (or $to_path,
 # where it was renamed) in another, so line numbers in one can be moved to
 # the other; none when they read the same, as a file in neither commit nor
-# their parents does. A file both deleted is compared as it was before them.
-# Undef when the path exists on one side only, or is a binary file that
-# changed.
+# their parents does. A file both deleted is compared as it was before them,
+# so undef when either commit has no parent; undef too when the path exists
+# on one side only, or is a binary file that changed.
 sub line_moves($self, $old, $new, $path, $to_path = $path) {
     return [] if $old->{revision} eq $new->{revision};
 
@@ -1006,8 +1006,9 @@ settled, with its marks.
 
 In an iteration that is not squashed, copy the flags of each previous
 commit no commit in C<\@commits> carries from (rewritten, so its change id
-changed, or dropped), pending and without seen marks: onto the last commit of
-iteration C<$number> that changes the flag's path, its lines moved by the
+changed, or dropped), pending and without seen marks, following the file to
+the path the VCS finds it renamed to by the iteration's head: onto the last
+commit of iteration C<$number> that changes the flag's path, its lines moved by the
 diff between the two commits' files where it keeps any, else on the whole
 file; with no commit changing the path, or no path, onto the iteration's
 last commit, flagging the whole file.
@@ -1061,8 +1062,9 @@ holding that path.
 The parsed diff hunks from C<$path> in one commit to C<$to_path> (default
 C<$path>; the file's new path when it was renamed) in the other (each a
 hashref with C<revision> and C<parent>): empty when the file reads the same,
-undef when it exists in only one. A file deleted in both is compared
-before them.
+as a file in neither commit nor their parents does; undef when it exists in
+only one. A file deleted in both is compared before them, so undef when
+either commit has no parent.
 
 =item $file = $builder->default_file($rev, $revision)
 

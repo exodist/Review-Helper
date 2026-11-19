@@ -67,7 +67,7 @@ var namesEntry = map[string]bool{"commit": true, "order": true, "note": true, "g
 
 // Fill validates a filled sheet (JSON text) and writes it.
 func Fill(d *DB, repo *git.Repo, j *Journal, data []byte) (*FillResult, error) {
-	c, err := loadSheetContext(d, repo, j, j.Warn)
+	c, err := loadSheetContext(d, repo, j)
 	if err != nil {
 		return nil, err
 	}
@@ -112,8 +112,10 @@ func Fill(d *DB, repo *git.Repo, j *Journal, data []byte) (*FillResult, error) {
 		}
 	}
 
-	// The notes were warned about above.
-	after, err := loadSheetContext(d, repo, j, nil)
+	// Read again for the count, quietly: the journal was warned about above.
+	quiet := *j
+	quiet.Warn = nil
+	after, err := loadSheetContext(d, repo, &quiet)
 	if err != nil {
 		return nil, err
 	}

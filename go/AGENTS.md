@@ -66,15 +66,17 @@ the page drive.
 
 The conformance checks are the behavioral contract. Unit tests cover what
 they cannot reach or pin precisely: diff parsing, attribution and section
-hunks (`diff_test.go`), the `rev` hash and line ranges (`sheet_test.go`),
-a split's refusals and layout (`fill_split_test.go`), topics and guide
-checks (`fill_topics_test.go`, `fill_guide_test.go`), merge nesting and
-flag line moves (`builder_test.go`), the publish prefixes and line fit
+hunks (`diff_test.go`), file kinds and a split's layout (`split_test.go`),
+the `rev` hash (`sheet_test.go`) and line ranges (`sheet_json_test.go`), a
+split's refusals (`fill_split_test.go`), topics and guide checks
+(`fill_topics_test.go`, `fill_guide_test.go`), merge nesting
+(`builder_test.go`), flag line moves and commit pairing
+(`carryforward_test.go`), the publish prefixes and line fit
 (`publish_test.go`), the export layout (`export_test.go`), import names
 (`import_test.go`), and the access layer's host check, token and static
 paths (`server_test.go`). A test lives in the `_test.go` file of the code
-it tests. A behavior every backend must
-have, that conformance misses, is added to `conformance/`.
+it tests. A behavior every backend must have, that conformance misses, is
+added to `conformance/`.
 
 Gates for every change: `gofmt -l .` prints nothing, `go vet ./...` is
 clean, and the tests above pass.

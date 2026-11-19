@@ -43,6 +43,9 @@ var reviewIDRE = regexp.MustCompile(`\A[0-9A-Za-z][0-9A-Za-z_-]*\z`)
 
 // Close marks a review closed in its file and the registry.
 func (r *Registry) Close(d *DB, path string) error {
+	if _, err := registryPath(path); err != nil {
+		return err
+	}
 	if err := d.SetState("closed"); err != nil {
 		return err
 	}
@@ -53,6 +56,19 @@ func (r *Registry) Close(d *DB, path string) error {
 	return r.Register(rv.ID, path, "closed")
 }
 
+// registryPath is path as the registry stores it: absolute, and valid UTF-8,
+// as JSON text cannot keep other bytes.
+func registryPath(path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	if !utf8.ValidString(abs) {
+		return "", fmt.Errorf("review file paths must be valid UTF-8: %q", abs)
+	}
+	return abs, nil
+}
+
 // Register records a review's file, by absolute path, and state.
 func (r *Registry) Register(id, path, state string) error {
 	if !reviewIDRE.MatchString(id) {
@@ -61,13 +77,9 @@ func (r *Registry) Register(id, path, state string) error {
 	if state != "open" && state != "closed" {
 		return fmt.Errorf("review state must be open or closed, not %q", state)
 	}
-	abs, err := filepath.Abs(path)
+	abs, err := registryPath(path)
 	if err != nil {
 		return err
-	}
-	// The registry holds paths as JSON text, which cannot keep other bytes.
-	if !utf8.ValidString(abs) {
-		return fmt.Errorf("review file paths must be valid UTF-8: %q", abs)
 	}
 	return r.update(func(reviews map[string]RegEntry) error {
 		reviews[id] = RegEntry{Path: abs, State: state}

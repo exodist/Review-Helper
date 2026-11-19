@@ -124,6 +124,11 @@ func Assemble(units []*Unit, lines []string) ([]*Unit, error) {
 	owner := make([]*Unit, len(lines)+2)
 	code := make([]bool, len(lines)+2)
 	for _, s := range sections {
+		for _, l := range append(rangeLines(s.Ranges), rangeLines(s.DocRanges)...) {
+			if l < 1 || l > len(lines) {
+				return nil, fmt.Errorf("line %d is outside the file's %d lines", l, len(lines))
+			}
+		}
 		for _, l := range rangeLines(s.Ranges) {
 			owner[l], code[l] = s, true
 		}

@@ -43,6 +43,22 @@ func TestParseAndCount(t *testing.T) {
 	}
 }
 
+// Under diff.suppressBlankEmpty git prints a blank context line as an
+// empty line, which at the end of the text must still be read.
+func TestParseTrailingBlankContext(t *testing.T) {
+	d, err := ParseDiff("@@ -1,4 +1,4 @@\n a\n b\n-c\n+C\n\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := d.Hunks[0].Lines
+	if len(lines) != 5 {
+		t.Fatalf("%d lines, want 5", len(lines))
+	}
+	if last := lines[4]; last.Type != " " || last.Text != "" || *last.Old != 4 || *last.New != 4 {
+		t.Fatalf("last line %+v", last)
+	}
+}
+
 func TestAttributeAndOwners(t *testing.T) {
 	d, _ := ParseDiff(sampleDiff)
 	a := &Span{Ranges: [][2]int{{1, 3}}}
@@ -91,33 +107,5 @@ func TestSectionHunks(t *testing.T) {
 	hs = SectionHunks(d.Hunks, newLines, []*Span{b}, 0)
 	if len(hs) != 2 || hs[0].Part != "code" || hs[1].Part != "docs" {
 		t.Fatalf("parts %+v", hs)
-	}
-}
-
-func TestAssembleAndKinds(t *testing.T) {
-	lines := []string{"package Foo;", "", "sub a {", "}", "", "1;"}
-	pkg := "Foo"
-	units := []*Unit{
-		{Name: "sub a", Package: &pkg, Ranges: [][2]int{{3, 4}}},
-		{Name: "header", Package: &pkg, Ranges: [][2]int{{1, 1}}},
-		{Name: "end", Package: &pkg, Ranges: [][2]int{{6, 6}}},
-	}
-	out, err := Assemble(units, lines)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out[0].Name != "header" || !reflect.DeepEqual(out[0].Ranges, [][2]int{{1, 2}}) || !reflect.DeepEqual(out[1].Ranges, [][2]int{{3, 5}}) {
-		t.Fatalf("assembled %+v %+v", out[0], out[1])
-	}
-	if _, err := Assemble(units[:1], lines); err == nil {
-		t.Fatal("a line with text in no section passes")
-	}
-	for p, want := range map[string]string{"lib/A.pm": "perl", "Makefile": "makefile", "x.PNG": "image", "bin/tool": "text"} {
-		if got := KindFor(p, ""); got != want {
-			t.Errorf("%s: %s", p, got)
-		}
-	}
-	if got := KindFor("bin/tool", "#!/usr/bin/env python3"); got != "python" {
-		t.Errorf("shebang: %s", got)
 	}
 }

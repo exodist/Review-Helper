@@ -377,19 +377,10 @@ func SkillsDir() (string, error) {
 	if err := os.Chmod(tmp, 0o755); err != nil {
 		return "", err
 	}
-	err = os.Rename(tmp, root)
-	if err != nil {
+	if err := os.Rename(tmp, root); err != nil {
 		if _, statErr := os.Stat(done); statErr == nil {
 			return dir, nil // another run put its copy in place first
 		}
-		// A copy left half-written by an older version, before copies
-		// were renamed into place.
-		if rmErr := os.RemoveAll(root); rmErr != nil {
-			return "", rmErr
-		}
-		err = os.Rename(tmp, root)
-	}
-	if err != nil {
 		return "", err
 	}
 	return dir, nil

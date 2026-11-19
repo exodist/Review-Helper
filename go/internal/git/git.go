@@ -309,7 +309,7 @@ func (r *Repo) RangeDiff(from, to, path, oldPath string) ([]byte, error) {
 // ResolutionChanges lists a merge's own changes (its conflict resolutions),
 // empty for a clean merge, a non-merge, or a git without --remerge-diff.
 func (r *Repo) ResolutionChanges(sha string, paths []string) ([]*Change, error) {
-	ok, err := r.hasRemergeDiff()
+	ok, err := r.remergeDiff()
 	if err != nil || !ok {
 		return nil, err
 	}
@@ -457,8 +457,6 @@ var versionRE = regexp.MustCompile(`(\d+)\.(\d+)`)
 
 // git 2.36 added --remerge-diff; show, not diff-tree, which dies with a BUG
 // on it before 2.47.
-func (r *Repo) hasRemergeDiff() (bool, error) { return r.remergeDiff() }
-
 func (r *Repo) probeRemergeDiff() (bool, error) {
 	out, err := r.git("version")
 	if err != nil {

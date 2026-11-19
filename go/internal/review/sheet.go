@@ -301,9 +301,9 @@ type sheetFile struct {
 }
 
 // loadSheetContext reads what the latest iteration's items are built from.
-// warn, when set, gets a line for each flagged note of the journal skipped
-// as one the journal could not have written.
-func loadSheetContext(d *DB, repo *git.Repo, j *Journal, warn io.Writer) (*sheetContext, error) {
+// The journal's Warn, when set, gets a line for each flagged note skipped as
+// one the journal could not have written.
+func loadSheetContext(d *DB, repo *git.Repo, j *Journal) (*sheetContext, error) {
 	it, err := d.LatestIteration()
 	if err != nil {
 		return nil, err
@@ -362,8 +362,8 @@ func loadSheetContext(d *DB, repo *git.Repo, j *Journal, warn io.Writer) (*sheet
 		}
 		// Only a note the journal could have written can become a flag.
 		if err := n.Problem(); err != nil {
-			if warn != nil {
-				fmt.Fprintf(warn, "skipping flagged journal note %s: %s\n", n.ID.Value, err)
+			if j.Warn != nil {
+				fmt.Fprintf(j.Warn, "skipping flagged journal note %s: %s\n", n.ID.Value, err)
 			}
 			continue
 		}
@@ -804,7 +804,7 @@ func (c *sheetContext) guideItem() *sheetItem {
 // BuildSheet is the latest iteration's sheet: the items still to do, or,
 // with all, every item.
 func BuildSheet(d *DB, repo *git.Repo, j *Journal, all bool) (*Sheet, error) {
-	c, err := loadSheetContext(d, repo, j, j.Warn)
+	c, err := loadSheetContext(d, repo, j)
 	if err != nil {
 		return nil, err
 	}
